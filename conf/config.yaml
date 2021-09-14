@@ -1,0 +1,8 @@
+defaults:
+  - training: default
+  - models: minkowski_graspnet
+  - data: acronymvid
+  - _self_
+
+model_path: tsgrasp.net.minkowski_graspnet # import path of model to load
+model_name: MinkowskiGraspNet # class name of model to load
