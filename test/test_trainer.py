@@ -5,6 +5,7 @@ def test_trainer_construction(cfg):
     trainer = Trainer(cfg)
     assert isinstance(trainer,  Trainer)
 
-def test_trainer_training(cfg):
-    trainer = Trainer(cfg)
-    trainer.train()
+# Takes forever -- only run in debugger
+# def test_trainer_training(cfg):
+#     trainer = Trainer(cfg)
+#     trainer.train()

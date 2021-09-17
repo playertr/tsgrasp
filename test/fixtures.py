@@ -18,7 +18,7 @@ def cfg():
         bce_loss_coeff: 1
         points_per_frame: 1000
         grid_size: 0.005
-        use_parallel_add_s: True
+        use_parallel_add_s: False
         feature_dimension: 1
 
         pl:
@@ -35,6 +35,7 @@ def cfg():
             datamodule_path: tsgrasp.data.lit_acronymvid
             datamodule_name: LitAcronymvidDataset
     training:
+        gpus: 1
         batch_size: 2
         data_len: 50
     """
