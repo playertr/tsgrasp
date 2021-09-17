@@ -10,7 +10,7 @@ from tsgrasp.net.modules.MinkowskiEngine import *
 log = logging.getLogger(__name__)
 
 class MinkowskiGraspNet(torch.nn.Module):
-    def __init__(self, cfg : DictConfig, feature_dimension : int):
+    def __init__(self, cfg : DictConfig):
         super().__init__()
 
         self.use_parallel_add_s = cfg.use_parallel_add_s
@@ -18,7 +18,7 @@ class MinkowskiGraspNet(torch.nn.Module):
         self.bce_loss_coeff = cfg.bce_loss_coeff
 
         self.backbone = initialize_minkowski_unet(
-            cfg.model_name, feature_dimension, cfg.backbone_out_dim, D=cfg.D
+            cfg.backbone_model_name, cfg.feature_dimension, cfg.backbone_out_dim, D=cfg.D
         )
         self.classification_head = nn.Sequential(
             nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
@@ -156,7 +156,7 @@ def sequential_add_s_loss(approach_dir, baseline_dir, positions, pos_control_poi
 
     logits = logits.view((n_batch, n_time, -1))
     labels = labels.view((n_batch, n_time, -1))
-    loss = torch.zeros(1)
+    loss = torch.zeros(1).type_as(approach_dir)
     for b in range(n_batch):
         
         if gt_grasps_per_batch[b] == 0:
@@ -236,7 +236,7 @@ def control_point_tensor(approach_dirs, baseline_dirs, positions, grasp_widths, 
     # Transform the gripper-frame points into camera frame
     gripper_pts = torch.cat([
         gripper_pts, 
-        torch.ones((len(gripper_pts), 1))],
+        torch.ones((len(gripper_pts), 1)).type_as(approach_dirs)],
         dim=1
     ) # make (5, 4) stack of homogeneous vectors
 
@@ -252,8 +252,8 @@ def build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_width, grip
     """
     grasps_R = torch.stack([baseline_dir, torch.cross(approach_dir, baseline_dir), approach_dir], axis=4)
     grasps_t = contact_pts + grasp_width/2 * baseline_dir - gripper_depth * approach_dir
-    ones = torch.ones((*contact_pts.shape[:3], 1, 1))
-    zeros = torch.zeros((*contact_pts.shape[:3], 1, 3))
+    ones = torch.ones((*contact_pts.shape[:3], 1, 1)).type_as(contact_pts)
+    zeros = torch.zeros((*contact_pts.shape[:3], 1, 3)).type_as(contact_pts)
     homog_vec = torch.cat([zeros, ones], axis=4)
 
     pred_grasp_tfs = torch.cat([torch.cat([grasps_R, torch.unsqueeze(grasps_t, 4)], dim=4), homog_vec], dim=3)

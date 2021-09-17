@@ -1,24 +1,26 @@
+from omegaconf.dictconfig import DictConfig
 import torch
 import numpy as np
 import pytorch_lightning as pl
 import torchmetrics
 import torch.nn.functional as F
 from tsgrasp.net.minkowski_graspnet import MinkowskiGraspNet
+import MinkowskiEngine as ME
 
-class LitModel(pl.LightningModule):
-    def __init__(self, input_shape, num_classes, data_len, learning_rate,chkpt_path=""):
+class LitMinkowskiGraspNet(pl.LightningModule):
+    def __init__(self, training_cfg : DictConfig, model_cfg : DictConfig):
         super().__init__()
         self.save_hyperparameters()
-        self.model = MinkowskiGraspNet(input_shape, num_classes)
-        self.learning_rate = learning_rate
-        self.loss = F.nll_loss
-        self.metric = torchmetrics.Accuracy()
-        self.data_len = data_len
+        self.model = MinkowskiGraspNet(model_cfg)
+        self.loss = self.model.loss
+        self.learning_rate = 0.001 # TODO pass as cfg
+        self.data_len = training_cfg.data_len
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
             [{
                 'params': [p for p in self.parameters()],
-                'name': 'my_parameter_group_name'
+                'name': 'minkowski_graspnet'
             }],
             lr=self.learning_rate
         )
@@ -34,16 +36,32 @@ class LitModel(pl.LightningModule):
             'name': 'learning_rate'
         }
         return [optimizer], [lr_scheduler]
+
     def forward(self,x):
-        logits = self.model(x)
-        return logits
+        return self.model.forward(x)
+
     def _step(self, batch, stage=None):
-        x, y = batch
-        logits = self.model(x)
-        loss = self.loss(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        acc = self.metric(preds, y)
-        return {'loss': loss, 'acc': acc}
+        stensor = ME.SparseTensor(
+        coordinates = batch['coordinates'],
+        features = batch['features']
+        )
+
+        class_logits, baseline_dir, approach_dir, grasp_offset = self.model.forward(stensor)
+
+        labels = batch['labels']
+
+        loss = self.model.loss(
+            class_logits, labels,
+            baseline_dir, approach_dir, grasp_offset,
+            positions = batch['positions'],
+            pos_control_points = batch['pos_control_points'], 
+            sym_pos_control_points = batch['sym_pos_control_points'],
+            gt_grasps_per_batch = batch['gt_grasps_per_batch'], 
+            single_gripper_points = batch['single_gripper_points']
+        )
+
+        return {'loss': loss}
+
     def _epoch_end(self, outputs, stage=None):
         if stage:
             acc = np.mean([float(x['acc']) for x in outputs])
@@ -71,6 +89,7 @@ class LitModel(pl.LightningModule):
     #
     #   on_train_epoch_end()
     # on_train_end
+
     def training_step(self, batch, batch_idx):
         return self._step(batch, "train")
 

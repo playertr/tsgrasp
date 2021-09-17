@@ -47,4 +47,3 @@ def test_minkowski_graspnet_loss(minkowski_graspnet, acronymvid_dataloader):
     )
 
     assert loss > 0, "Loss should be a real positive number."
-

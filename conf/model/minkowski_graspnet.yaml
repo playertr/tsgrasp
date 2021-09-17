@@ -1,0 +1,15 @@
+# @package model
+
+model_name: MinkowskiGraspNet
+backbone_model_name: "MinkUNet14A"
+D: 4
+backbone_out_dim: 128
+add_s_loss_coeff: 10
+bce_loss_coeff: 1
+use_parallel_add_s: False
+feature_dimension: 1
+
+# Lightning wrapper config
+pl:
+  module_path : tsgrasp.net.lit_minkowski_graspnet
+  module_name : LitMinkowskiGraspNet

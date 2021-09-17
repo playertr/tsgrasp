@@ -1,1 +1,4 @@
 # @package training
+gpus: 1
+batch_size: 2
+data_len: 50

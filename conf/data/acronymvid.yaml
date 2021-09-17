@@ -1,4 +1,11 @@
 # @package data
 
-feature_dimension: 1
+dataroot: /home/tim/Research/tsgrasp/data/acronymvid
 points_per_frame: 1000
+grid_size: 0.05
+num_workers: 4
+
+# Lightning trainer config
+pl:
+  datamodule_path : tsgrasp.data.lit_acronymvid
+  datamodule_name : LitAcronymvidDataset
