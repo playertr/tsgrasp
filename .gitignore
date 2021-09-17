@@ -1,2 +1,5 @@
 outputs/
 *.pyc
+/data/
+.vscode
+lightning_logs/
