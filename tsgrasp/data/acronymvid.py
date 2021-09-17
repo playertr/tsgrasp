@@ -1,21 +1,13 @@
 import h5py
 import os
 import numpy as np
+from numpy.lib import index_tricks
 import torch
 from dataclasses import dataclass
 from tsgrasp.utils.mesh_utils import create_gripper
 import MinkowskiEngine as ME
 from omegaconf import DictConfig
-
-@dataclass
-class Data:
-    time : torch.Tensor
-    pos: torch.Tensor
-    x: torch.Tensor
-    y: torch.Tensor
-    pos_control_points: np.ndarray
-    sym_pos_control_points: np.ndarray
-    single_gripper_pts: torch.Tensor
+from functools import reduce
 
 class AcronymVidDataset(torch.utils.data.Dataset):
     """
@@ -27,6 +19,8 @@ class AcronymVidDataset(torch.utils.data.Dataset):
     def __init__(self, cfg : DictConfig, split="train"):
 
         self.root = cfg.dataroot
+        self.pts_per_frame = cfg.points_per_frame
+        self.grid_size = cfg.grid_size
 
         # Find the raw filepaths. For now, we're doing no file-based preprocessing.
         if split in ["train", "val", "test"]:
@@ -46,7 +40,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         if len(os.listdir(self.raw_dir)) == 0:
             print(f"No files found in {self.raw_dir}. Please create the dataset using the scripts in GraspRefinement and ACRONYM.")
 
-    def len(self):
+    def __len__(self):
         return len(self._trajectories)
 
     def __getitem__(self, idx):
@@ -70,46 +64,37 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         tfs_from_cam_to_obj = tfs_from_cam_to_obj[::3,:,:]
 
         pcs = [depth_to_pointcloud(d) for d in depth]
+        labels = [label_frame for label_frame in labels]
+
+        ## Downsample points
+        for i in range(len(pcs)):
+            idxs = torch.randperm(len(pcs[i]), dtype=torch.int32, device='cpu')[:self.pts_per_frame].sort()[0].long()
+            
+            pcs[i] = pcs[i][idxs]
+            labels[i] = labels[i].ravel()[idxs]
+
+        ## Quantize points to grid
+        positions = torch.Tensor(pcs) # save positions prior to truncation
+        pcs = [(pc / self.grid_size).astype(int) for pc in pcs]
+
         pcs = multi_pointcloud_to_4d_coords(pcs)
+        coords4d = torch.Tensor(pcs)
 
         ## Calculate gripper widths
         # cp = grasp_contact_points
         # widths = np.linalg.norm(cp[:,0,:] - cp[:,1,:], axis=1)
 
-        ## Generate camera-frame grasp poses corresponding to closest points
-        obj_frame_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
-        tfs_from_obj_to_cam = np.array([inverse_homo(t) for t in tfs_from_cam_to_obj])
+        control_pts, sym_control_pts, single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, tfs_from_cam_to_obj, self.root)
 
-        # gross numpy broadcasting
-        # https://stackoverflow.com/questions/32171917/copy-2d-array-into-3rd-dimension-n-times-python
-        cam_frame_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_grasp_tfs[np.newaxis,:,:,:])
-        # (30, 2000, 4, 4)
-
-        ## Create 3D tensor of (num_good_grasps, 5, 3) control points
-        gripper = create_gripper('panda', root_folder=self.root)
-        gripper_control_points = gripper.get_control_point_tensor(max(1, pos_grasp_tfs.shape[0]), use_tf=False) # num_gt_grasps x 5 x 3
-
-        gripper_control_points_homog =  np.concatenate([gripper_control_points, np.ones((gripper_control_points.shape[0], gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
-
-        control_points = np.matmul(gripper_control_points_homog, cam_frame_grasp_tfs.transpose((0, 1, 3, 2)))[:,:,:,:3]
-
-        ## Create flipped symmetric control points for symmetric ADD-S loss
-        sym_gripper_control_points = gripper.get_control_point_tensor(max(1, pos_grasp_tfs.shape[0]), symmetric=True, use_tf=False) # num_gt_grasps x 5 x 3
-
-        sym_gripper_control_points_homog =  np.concatenate([sym_gripper_control_points, np.ones((sym_gripper_control_points.shape[0], sym_gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
-
-        sym_control_points = np.matmul(sym_gripper_control_points_homog, cam_frame_grasp_tfs.transpose((0, 1, 3, 2)))[:,:,:,:3]
-
-        coords4d = torch.Tensor(pcs)
-        data = Data(
-            time=coords4d[:,0],     # First col is time
-            pos = coords4d[:, 1:],  # Last 3 cols are x, y, z
-            x=torch.ones((len(pcs), 1)), 
-            y=torch.Tensor(labels).view(-1 ,1),
-            pos_control_points = control_points,
-            sym_pos_control_points = sym_control_points,
-            single_gripper_pts = torch.Tensor(gripper_control_points[0])
-        )
+        data = {
+            "coordinates" : coords4d,
+            "positions" : positions,
+            "features" : torch.ones((len(coords4d), 1)),
+            "labels" : torch.Tensor(labels).view(-1, 1),
+            "pos_control_points" : torch.Tensor(control_pts),
+            "sym_pos_control_points" : torch.Tensor(sym_control_pts),
+            "single_gripper_points" : torch.Tensor(single_gripper_control_pts)
+        }
 
         return data
 
@@ -121,18 +106,143 @@ def minkowski_collate_fn(list_data):
     coordinates_batch, features_batch, labels_batch = ME.utils.sparse_collate(
         [d["coordinates"] for d in list_data],
         [d["features"] for d in list_data],
-        [d["label"] for d in list_data],
+        [d["labels"] for d in list_data],
         dtype=torch.float32,
     )
+
+    # pos_cp_list = [d["pos_control_points"] for d in list_data]
+    # padded_stack(pos_cp_list)
+
+    ## Each batch may have different numbers of ground truth grasps, resulting in ragged tensors. We require even, rectangular tensors for calculating the ADD-S loss, so we collate them into rectangular tensors.
+    pos_control_points, sym_pos_control_points, gt_grasps_per_batch = collate_control_points(
+        batch = torch.arange(len(list_data)),
+        time = torch.stack([d["coordinates"][:,0] for d in list_data]),
+        pos_cp_list = [d["pos_control_points"] for d in list_data],
+        sym_pos_cp_list = [d["sym_pos_control_points"] for d in list_data]
+    )
+
     return {
         "coordinates": coordinates_batch,
+        "positions": torch.stack([d["positions"] for d in list_data]),
         "features": features_batch,
         "labels": labels_batch,
+        "pos_control_points": pos_control_points,
+        "sym_pos_control_points": sym_pos_control_points,
+        "single_gripper_points": list_data[0]['single_gripper_points'],
+        "gt_grasps_per_batch": gt_grasps_per_batch
     }
 
-# def downsample(d : dict, pts_per_frame : int) -> dict:
-#     """Randomly downsample coordinates or features."""
-#     # Find how many 
+# def padded_stack(t_list) -> torch.Tensor:
+
+#     # In what dimension do the tensors have different shapes?
+#     shapes = [torch.Tensor(list(t.shape)).int() for t in t_list]
+
+#     assert all(len(s) == len(shapes[0]) for s in shapes), "All input tensors must have the same number of dimensions."
+    
+#     dims_equal = [
+#         all(s[i] == shapes[0][i] for s in shapes) # All shapes same in this dim
+#         for i in range(len(shapes[0]))
+#     ]
+
+#     if all(dims_equal):
+#         return torch.stack(t_list)
+
+#     assert sum(dims_equal) == len(dims_equal)-1, "Input tensors may only vary in one dimension."
+
+#     unequal_dim = torch.where(~torch.Tensor(dims_equal).bool())[0]
+
+#     def pad(t, shape):
+#         idxs = list(range())
+
+#     padded = [pad(t) for t in t_list]
+
+#     return torch.stack(padded)
+
+def collate_control_points(batch, time, pos_cp_list, sym_pos_cp_list):
+    """Pack the ground truth control points into a dense tensor.
+
+    If the control point tensors are not the same shape, then duplicate entries
+    from the smaller ones until they are the same shape. Because the ADD-S loss
+    considers the minimum distance from a ground truth grasp, duplicating ground
+    truth grasps will not affect the grasp.
+    """
+
+    n_batch = len(batch.unique())
+    n_time = len(time.unique())
+
+    cp_shapes = [cp.shape for cp in pos_cp_list]
+    gt_grasps_per_batch = [shape[1] for shape in cp_shapes]
+    pos_control_points = torch.empty((
+        n_batch,
+        n_time,
+        max(gt_grasps_per_batch),
+        5,
+        3
+    ))
+    sym_pos_control_points = torch.empty((
+        n_batch,
+        n_time,
+        max(gt_grasps_per_batch),
+        5,
+        3
+    ))
+
+    # Pad control point tensors by repeating if different.
+    if not reduce(np.array_equal, cp_shapes):
+        for i in range(len(pos_cp_list)):
+            if gt_grasps_per_batch[i] > 0:
+                idxs = list(range(gt_grasps_per_batch[i]))
+                idxs = idxs + [0]*(max(gt_grasps_per_batch) - gt_grasps_per_batch[i])
+                pos_control_points[i] = pos_cp_list[i][:,idxs,:,:]
+                sym_pos_control_points[i] = sym_pos_cp_list[i][:,idxs,:,:]
+            # else: leave tensor uninitialized; do not use in ADD-S loss.
+    else:
+        for i in range(len(pos_cp_list)):
+            if gt_grasps_per_batch[i] > 0:
+                pos_control_points[i] = pos_cp_list[i]
+                sym_pos_control_points[i] = sym_pos_cp_list[i]
+            # else: leave tensor uninitialized; do not use in ADD-S loss.
+            
+    return pos_control_points, sym_pos_control_points, gt_grasps_per_batch
+
+def camera_frame_control_pts(pos_grasp_tfs, tfs_from_cam_to_obj, dataroot):
+    """Compute the control points corresponding to ground truth grasps, in the camera frame.
+
+    Args:
+        pos_grasp_tfs ([type]): (M, 4, 4) array of object-frame positive ground truth grasp transforms
+        tfs_from_cam_to_obj ([type]): (T, 4, 4) array of object-frame camera poses
+        dataroot (str): folder with gripper control point .npz files
+
+    Returns:
+        control_points [type]: camera-frame gournd truth control points
+        sym_control_points [type]: camera-frame symmetric (switched 180 deg along wrist) control points
+        gripper_control_points [type]: (5,3) array describing the gripper control points in the gripper frame. This is multiplied by predicted grasp transforms to get predicted control points.
+    """
+    ## Generate camera-frame grasp poses corresponding to closest points
+    obj_frame_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
+    tfs_from_obj_to_cam = np.array([inverse_homo(t) for t in tfs_from_cam_to_obj])
+
+    # gross numpy broadcasting
+    # https://stackoverflow.com/questions/32171917/copy-2d-array-into-3rd-dimension-n-times-python
+    cam_frame_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_grasp_tfs[np.newaxis,:,:,:])
+    # (30, 2000, 4, 4)
+
+    ## Create 3D tensor of (num_good_grasps, 5, 3) control points
+    gripper = create_gripper('panda', root_folder=dataroot)
+    gripper_control_points = gripper.get_control_point_tensor(max(1, pos_grasp_tfs.shape[0]), use_tf=False) # num_gt_grasps x 5 x 3
+
+    gripper_control_points_homog =  np.concatenate([gripper_control_points, np.ones((gripper_control_points.shape[0], gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
+
+    control_points = np.matmul(gripper_control_points_homog, cam_frame_grasp_tfs.transpose((0, 1, 3, 2)))[:,:,:,:3]
+
+    ## Create flipped symmetric control points for symmetric ADD-S loss
+    sym_gripper_control_points = gripper.get_control_point_tensor(max(1, pos_grasp_tfs.shape[0]), symmetric=True, use_tf=False) # num_gt_grasps x 5 x 3
+
+    sym_gripper_control_points_homog =  np.concatenate([sym_gripper_control_points, np.ones((sym_gripper_control_points.shape[0], sym_gripper_control_points.shape[1], 1))], axis=2)  # b x 5 x 4
+
+    sym_control_points = np.matmul(sym_gripper_control_points_homog, cam_frame_grasp_tfs.transpose((0, 1, 3, 2)))[:,:,:,:3]
+
+    return control_points, sym_control_points, gripper_control_points[0]
 
 def multi_pointcloud_to_4d_coords(pcs):
     """Convert a list of N (L, 3) ndarrays into a single (N*L, 4) ndarray, where the first dimension becomes the time dimension."""
@@ -196,20 +306,3 @@ if __name__ == "__main__":
     breakpoint()
 
     print("done")
-
-def minkowski_collate_fn(list_data):
-    r"""
-    Collation function for MinkowskiEngine.SparseTensor that creates batched
-    cooordinates given a list of dictionaries.
-    """
-    coordinates_batch, features_batch, labels_batch = ME.utils.sparse_collate(
-        [d["coordinates"] for d in list_data],
-        [d["features"] for d in list_data],
-        [d["labels"] for d in list_data],
-        dtype=torch.float32,
-    )
-    return {
-        "coordinates": coordinates_batch,
-        "features": features_batch,
-        "labels": labels_batch,
-    }
