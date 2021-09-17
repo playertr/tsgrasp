@@ -16,6 +16,9 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.learning_rate = 0.001 # TODO pass as cfg
         self.data_len = training_cfg.data_len
 
+        self.train_pt_acc = torchmetrics.Accuracy()
+        self.val_pt_acc = torchmetrics.Accuracy()
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
             [{
@@ -40,7 +43,11 @@ class LitMinkowskiGraspNet(pl.LightningModule):
     def forward(self,x):
         return self.model.forward(x)
 
-    def _step(self, batch, stage=None):
+    def _step(self, batch,  batch_idx, stage=None):
+
+        if batch_idx % 20 == 0:
+            torch.cuda.empty_cache() # recommended for Minkowski
+
         stensor = ME.SparseTensor(
         coordinates = batch['coordinates'],
         features = batch['features']
@@ -48,10 +55,10 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
         class_logits, baseline_dir, approach_dir, grasp_offset = self.model.forward(stensor)
 
-        labels = batch['labels']
+        pt_labels = batch['labels']
 
         loss = self.model.loss(
-            class_logits, labels,
+            class_logits, pt_labels,
             baseline_dir, approach_dir, grasp_offset,
             positions = batch['positions'],
             pos_control_points = batch['pos_control_points'], 
@@ -60,14 +67,21 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             single_gripper_points = batch['single_gripper_points']
         )
 
-        return {'loss': loss}
+        pt_preds = class_logits > 0
+
+        return {'loss': loss, 'pt_preds': pt_preds, 'pt_labels': pt_labels}
+
+    def training_step_end(self, outputs):
+        self.train_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
+        self.log('train_pt_acc', self.train_pt_acc)
+
+    def validation_step_end(self, outputs):
+        self.val_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
+        self.log('val_pt_acc', self.val_pt_acc)
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
-            acc = np.mean([float(x['acc']) for x in outputs])
             loss = np.mean([float(x['loss']) for x in outputs])
-            self.logger.log_metrics(
-                {f"{stage}/acc": acc}, self.current_epoch + 1)
             self.logger.log_metrics(
                 {f"{stage}/loss": loss}, self.current_epoch + 1)
     
@@ -91,13 +105,13 @@ class LitMinkowskiGraspNet(pl.LightningModule):
     # on_train_end
 
     def training_step(self, batch, batch_idx):
-        return self._step(batch, "train")
+        return self._step(batch, batch_idx, "train")
 
     def validation_step(self, batch, batch_idx):
-        return self._step(batch, "val")
+        return self._step(batch, batch_idx, "val")
 
     def test_step(self, batch, batch_idx):
-        return self._step(batch)
+        return self._step(batch, batch_idx,)
 
     def training_epoch_end(self, outputs):
         self._epoch_end(outputs, "train")

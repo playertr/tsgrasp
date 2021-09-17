@@ -5,6 +5,7 @@ points_per_frame: 1000
 grid_size: 0.05
 num_workers: 4
 
+subset_factor: 64
 # Lightning trainer config
 pl:
   datamodule_path : tsgrasp.data.lit_acronymvid

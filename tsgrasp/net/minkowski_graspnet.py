@@ -2,7 +2,6 @@ from functools import reduce
 import logging
 import torch.nn.functional as F
 import torch
-import numpy as np
 from omegaconf import DictConfig
 
 from tsgrasp.net.modules.MinkowskiEngine import *

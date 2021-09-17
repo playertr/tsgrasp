@@ -1,4 +1,10 @@
 # @package training
 gpus: 1
-batch_size: 2
+batch_size: 8
 data_len: 50
+max_epochs: 2
+
+use_wandb: False
+wandb:
+  project: "TSGrasp"
+  experiment: "test"

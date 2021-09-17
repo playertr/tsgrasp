@@ -1,10 +1,16 @@
 from omegaconf import DictConfig
 import importlib
 import pytorch_lightning as pl
+import tensorboard
+import os
+import wandb
+from pytorch_lightning import loggers
+from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
 
 class Trainer:
     def __init__(self, cfg : DictConfig):
 
+        ## Lightning module and datamodule
         PLModuleClass = dynamic_import(
             cfg.model.pl.module_path, 
             cfg.model.pl.module_name
@@ -20,7 +26,30 @@ class Trainer:
             data_cfg = cfg.data,
             batch_size = cfg.training.batch_size
         )
-        self.trainer = pl.Trainer(gpus=cfg.training.gpus)
+
+        ## Loggers
+        tb_dir = os.path.join(os.getcwd(), "tensorboard")
+        os.makedirs(tb_dir, exist_ok=True)
+        tb_logger = loggers.TensorBoardLogger(tb_dir)
+        _loggers = [tb_logger]
+
+        if cfg.training.use_wandb:
+            wandb.login()
+            wandb_logger = loggers.WandbLogger(
+                project=cfg.training.wandb.project, log_model="all", name=cfg.training.wandb.experiment
+            )
+            wandb_logger.watch(self.pl_model)
+            _loggers.append(wandb_logger)
+
+        _callbacks = [ModelCheckpoint(), LearningRateMonitor(logging_interval='step')]
+
+        ## Lightning Trainer
+        self.trainer = pl.Trainer(
+            gpus=cfg.training.gpus,
+            logger=_loggers,
+            log_every_n_steps=10,
+            callbacks=_callbacks,
+            max_epochs=cfg.training.max_epochs)
 
     def train(self):
         self.trainer.fit(self.pl_model, self.pl_dataset)

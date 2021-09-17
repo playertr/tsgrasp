@@ -1,10 +1,9 @@
 from typing import Optional
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from omegaconf import DictConfig
 
 from tsgrasp.data.acronymvid import AcronymVidDataset, minkowski_collate_fn
-
 
 class LitAcronymvidDataset(pl.LightningDataModule):
     def __init__(self, data_cfg : DictConfig, batch_size):
@@ -16,20 +15,15 @@ class LitAcronymvidDataset(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         if stage == "fit" or stage is None:
             self.dataset_train = AcronymVidDataset(self.data_cfg, split="train")
-            # self.dataset_train = AcronymVidDataset(self.data_dir, split="val")
-            # dataset_full = AcronymVidDataset(self.data_dir, train=True)
-            # self.dataset_train, self.dataset_val = random_split(
-            #     dataset_full, [45000, 5000])
+            self.dataset_val   = AcronymVidDataset(self.data_cfg, split="test")
 
-        if stage == "test" or stage is None:
-            self.dataset_test = AcronymVidDataset(
-                self.data_cfg, split="test")
+            if "subset_factor" in self.data_cfg:
+                self.dataset_train = Subset(
+                    self.dataset_train, 
+                    indices=range(0, len(self.dataset_train), self.data_cfg.subset_factor))
 
     def train_dataloader(self):
         return DataLoader(self.dataset_train, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True, collate_fn=minkowski_collate_fn)
 
-    # def val_dataloader(self):
-    #     return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def test_dataloader(self):
-        return DataLoader(self.dataset_test, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn)
+    def val_dataloader(self):
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn)

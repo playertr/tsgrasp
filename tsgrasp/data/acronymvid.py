@@ -1,9 +1,7 @@
 import h5py
 import os
 import numpy as np
-from numpy.lib import index_tricks
 import torch
-from dataclasses import dataclass
 from tsgrasp.utils.mesh_utils import create_gripper
 import MinkowskiEngine as ME
 from omegaconf import DictConfig
@@ -159,7 +157,8 @@ def minkowski_collate_fn(list_data):
 #     return torch.stack(padded)
 
 def collate_control_points(batch, time, pos_cp_list, sym_pos_cp_list):
-    """Pack the ground truth control points into a dense tensor.
+    """Pack the ground truth control points into a multidimensional dense
+    tensor.
 
     If the control point tensors are not the same shape, then duplicate entries
     from the smaller ones until they are the same shape. Because the ADD-S loss
@@ -295,14 +294,3 @@ def inverse_homo(tf):
         [R.T, -t],
         [0, 0, 0, 1]
     ])
-
-if __name__ == "__main__":
-    # Test loading dataset.
-    gds = AcronymVidDataset(root="/home/tim/Research/GraspRefinement/data/acronymvid", split="test")
-
-    print(gds)
-    print(gds[0])
-
-    breakpoint()
-
-    print("done")
