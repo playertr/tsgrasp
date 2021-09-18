@@ -2,6 +2,7 @@ from typing import Optional
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Subset
 from omegaconf import DictConfig
+import os
 
 from tsgrasp.data.acronymvid import AcronymVidDataset, minkowski_collate_fn
 
@@ -27,3 +28,8 @@ class LitAcronymvidDataset(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn)
+
+    def prepare_data(self):
+        files = os.listdir(self.data_cfg.dataroot)
+        if not all( split in files for split in ['test', 'train', 'unicorn']):
+            raise FileNotFoundError(f"Dataroot <{self.data_cfg.dataroot}> not populated with data files. Download or generate dataset.")

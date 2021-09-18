@@ -51,4 +51,4 @@ class Trainer:
         )
 
     def train(self):
-        self.trainer.fit(self.pl_model, self.pl_dataset)
+        self.trainer.fit(self.pl_model, datamodule=self.pl_dataset)

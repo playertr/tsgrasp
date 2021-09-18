@@ -19,6 +19,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         self.root = cfg.dataroot
         self.pts_per_frame = cfg.points_per_frame
         self.grid_size = cfg.grid_size
+        self.time_decimation_factor = cfg.time_decimation_factor
 
         # Find the raw filepaths. For now, we're doing no file-based preprocessing.
         if split in ["train", "val", "test"]:
@@ -57,9 +58,9 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             # grasp_contact_points = np.asarray(ds["grasps/contact_points"])
 
         ## Make data shorter via temporal decimation
-        depth = depth[::3, :, :]
-        labels = labels[::3, :, :]
-        tfs_from_cam_to_obj = tfs_from_cam_to_obj[::3,:,:]
+        depth = depth[::self.time_decimation_factor, :, :]
+        labels = labels[::self.time_decimation_factor, :, :]
+        tfs_from_cam_to_obj = tfs_from_cam_to_obj[::self.time_decimation_factor,:,:]
 
         pcs = [depth_to_pointcloud(d) for d in depth]
         labels = [label_frame for label_frame in labels]

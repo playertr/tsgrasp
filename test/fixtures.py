@@ -10,43 +10,42 @@ from torch.utils.data import DataLoader
 def cfg():
     s = """
     model:
-        model_name: MinkowskiGraspNet
-        backbone_model_name: "MinkUNet14A"
-        D: 4
-        backbone_out_dim: 128
-        add_s_loss_coeff: 10
-        bce_loss_coeff: 1
-        points_per_frame: 1000
-        grid_size: 0.005
-        use_parallel_add_s: False
-        feature_dimension: 1
-
-        pl:
-            module_path: tsgrasp.net.lit_minkowski_graspnet
-            module_name: LitMinkowskiGraspNet
+        _target_: tsgrasp.net.lit_minkowski_graspnet.LitMinkowskiGraspNet
+        model_cfg:
+            backbone_model_name: "MinkUNet14A"
+            D: 4
+            backbone_out_dim: 128
+            add_s_loss_coeff: 10
+            bce_loss_coeff: 1
+            use_parallel_add_s: False
+            feature_dimension: 1
     data:
-        dataroot: /home/tim/Research/tsgrasp/data/acronymvid
-        points_per_frame: 1000
-        grid_size: 0.05
-        num_workers: 4
-
-        # Lightning trainer config
-        pl:
-            datamodule_path: tsgrasp.data.lit_acronymvid
-            datamodule_name: LitAcronymvidDataset
+        _target_: tsgrasp.data.lit_acronymvid.LitAcronymvidDataset
+        data_cfg:
+            dataroot: /home/tim/Research/tsgrasp/data/acronymvid
+            points_per_frame: 1000
+            grid_size: 0.05
+            num_workers: 4
+            time_decimation_factor: 3
+            subset_factor: 64
     training:
         gpus: 1
         batch_size: 2
         data_len: 50
+        max_epochs: 100
+        use_wandb: False
     """
     return OmegaConf.create(s)
 
 @pytest.fixture
 def acronymvid_cfg():
     s = """
-    dataroot : /home/tim/Research/tsgrasp/data/acronymvid
+    dataroot: /home/tim/Research/tsgrasp/data/acronymvid
     points_per_frame: 1000
     grid_size: 0.05
+    num_workers: 4
+    time_decimation_factor: 3
+    subset_factor: 64
     """
     return OmegaConf.create(s)
 
