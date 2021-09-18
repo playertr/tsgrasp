@@ -68,7 +68,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
         pt_preds = class_logits > 0
 
-        return {'loss': loss, 'pt_preds': pt_preds, 'pt_labels': pt_labels}
+        return {'loss': loss, 'pt_preds': pt_preds.detach().cpu(), 'pt_labels': pt_labels.detach().cpu()}
 
     def training_step_end(self, outputs):
         self.train_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
