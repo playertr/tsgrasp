@@ -8,7 +8,7 @@ from tsgrasp.net.minkowski_graspnet import MinkowskiGraspNet
 import MinkowskiEngine as ME
 
 class LitMinkowskiGraspNet(pl.LightningModule):
-    def __init__(self, training_cfg : DictConfig, model_cfg : DictConfig):
+    def __init__(self, model_cfg : DictConfig, training_cfg : DictConfig):
         super().__init__()
         self.save_hyperparameters()
         self.model = MinkowskiGraspNet(model_cfg)

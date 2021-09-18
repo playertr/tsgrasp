@@ -1,12 +1,12 @@
 # @package data
 
-dataroot: /home/tim/Research/tsgrasp/data/acronymvid
-points_per_frame: 1000
-grid_size: 0.05
-num_workers: 4
+# Pytorch Lightning datamodule to instantiate
+_target_: tsgrasp.data.lit_acronymvid.LitAcronymvidDataset
 
-subset_factor: 64
-# Lightning trainer config
-pl:
-  datamodule_path : tsgrasp.data.lit_acronymvid
-  datamodule_name : LitAcronymvidDataset
+data_cfg:
+  dataroot: /home/tim/Research/tsgrasp/data/acronymvid
+  points_per_frame: 1000
+  grid_size: 0.05
+  num_workers: 4
+
+  subset_factor: 64
