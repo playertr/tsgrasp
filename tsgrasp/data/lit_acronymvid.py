@@ -31,5 +31,5 @@ class LitAcronymvidDataset(pl.LightningDataModule):
 
     def prepare_data(self):
         files = os.listdir(self.data_cfg.dataroot)
-        if not all( split in files for split in ['test', 'train', 'unicorn']):
+        if not all( split in files for split in ['test', 'train']):
             raise FileNotFoundError(f"Dataroot <{self.data_cfg.dataroot}> not populated with data files. Download or generate dataset.")
