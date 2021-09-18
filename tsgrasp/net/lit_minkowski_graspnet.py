@@ -45,8 +45,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
     def _step(self, batch,  batch_idx, stage=None):
 
-        if batch_idx % 20 == 0:
-            torch.cuda.empty_cache() # recommended for Minkowski
+        torch.cuda.empty_cache() # recommended for Minkowski
 
         stensor = ME.SparseTensor(
         coordinates = batch['coordinates'],
