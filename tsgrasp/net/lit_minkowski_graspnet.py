@@ -68,15 +68,17 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
         pt_preds = class_logits > 0
 
-        return {'loss': loss, 'pt_preds': pt_preds.detach().cpu(), 'pt_labels': pt_labels.detach().cpu()}
+        return {'loss': loss, 'pt_preds': pt_preds.detach(), 'pt_labels': pt_labels.detach()}
 
     def training_step_end(self, outputs):
         self.train_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
         self.log('train_pt_acc', self.train_pt_acc)
+        self.log('training_loss', outputs['loss'])
 
     def validation_step_end(self, outputs):
         self.val_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
         self.log('val_pt_acc', self.val_pt_acc)
+        self.log('val_loss', outputs['loss'])
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
