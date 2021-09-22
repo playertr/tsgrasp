@@ -2,7 +2,7 @@ import h5py
 import os
 import numpy as np
 import torch
-from tsgrasp.utils.mesh_utils import create_gripper
+from tsgrasp.utils.mesh_utils.mesh_utils import create_gripper
 import MinkowskiEngine as ME
 from omegaconf import DictConfig
 from functools import reduce
