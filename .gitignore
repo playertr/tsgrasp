@@ -3,3 +3,4 @@ outputs/
 /data/
 .vscode
 lightning_logs/
+scratch/
