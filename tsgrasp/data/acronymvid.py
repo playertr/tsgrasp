@@ -3,7 +3,6 @@ import os
 import numpy as np
 import torch
 from tsgrasp.utils.mesh_utils.mesh_utils import create_gripper
-import MinkowskiEngine as ME
 from omegaconf import DictConfig
 from functools import reduce
 
@@ -92,7 +91,8 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             "labels" : torch.Tensor(labels).view(-1, 1),
             "pos_control_points" : torch.Tensor(control_pts),
             "sym_pos_control_points" : torch.Tensor(sym_control_pts),
-            "single_gripper_points" : torch.Tensor(single_gripper_control_pts)
+            "single_gripper_points" : torch.Tensor(single_gripper_control_pts),
+            "depth" : torch.Tensor(depth.astype(np.float32)) # np.float32 for endianness
         }
 
         return data
@@ -102,6 +102,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         return self.root
 
 def minkowski_collate_fn(list_data):
+    import MinkowskiEngine as ME
     coordinates_batch, features_batch, labels_batch = ME.utils.sparse_collate(
         [d["coordinates"] for d in list_data],
         [d["features"] for d in list_data],
