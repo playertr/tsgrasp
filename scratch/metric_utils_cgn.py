@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys, os
 # ROOT_DIR = "/home/tim/Research/tsgrasp"
-ROOT_DIR = "/scratch/playert/workdir/tsgrasp"
+WORK_DIR = "/home/tim/Research"
+ROOT_DIR = os.path.join(WORK_DIR, "tsgrasp")
 sys.path.insert(0, ROOT_DIR)
 
 import hydra
@@ -252,7 +253,7 @@ def plot_success_coverage_curve_on_testset():
 
 def load_cgn():
     ########################### Import CGN stuff ###############################
-    sys.path.insert(0, "/scratch/playert/workdir/contact_graspnet/contact_graspnet")
+    sys.path.insert(0, os.path.join(WORK_DIR, "contact_graspnet/contact_graspnet"))
     from contact_grasp_estimator import GraspEstimator
     from visualization_utils import visualize_grasps, show_image
     from data import load_available_input_data
@@ -266,7 +267,7 @@ def load_cgn():
     ########################### Load CGN ###############################
 
     # argparse params from contact_graspnet/inference.py
-    ckpt_dir = '/scratch/playert/workdir/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001'
+    ckpt_dir = os.path.join(WORK_DIR, "contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001")
     forward_passes = 1
     arg_configs = []
 
