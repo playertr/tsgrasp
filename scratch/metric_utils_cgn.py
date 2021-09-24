@@ -1,11 +1,14 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 import sys, os
-ROOT_DIR = "/home/tim/Research/tsgrasp"
+# ROOT_DIR = "/home/tim/Research/tsgrasp"
+ROOT_DIR = "/scratch/playert/workdir/tsgrasp"
 sys.path.insert(0, ROOT_DIR)
 
 import hydra
 import torch
 from torch.utils.data import DataLoader
-import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from omegaconf import OmegaConf, DictConfig
 from tqdm import tqdm
 
@@ -74,7 +77,7 @@ def success_coverage_curve(confs, pred_grasps, gt_grasps, gt_labels):
     """Determine the success and coverage at various threshold confidence values."""
 
     res = []
-    thresholds = torch.linspace(0, 1, 100)
+    thresholds = torch.linspace(0, 1, 1000)
 
     for t in thresholds:
         pred_classes = confs > t
@@ -103,48 +106,68 @@ def main(cfg : DictConfig):
 
     
     sess, cgn = load_cgn()
+    cgn.select_grasps = select_all_grasps # hacky override
     
+    s_c_curves = []
     for i, data in enumerate(dl):
 
-        depth = data['depth'][0][0]
+        pc_full = data['positions'][0][0].numpy()
+        orig_pc_full = pc_full.copy()
 
-        # TODO: Remove this magic value
-        K = np.array([
-            [912.72143555, 0.0, 649.00366211], 
-            [0.0, 912.7409668, 363.25247192], 
-            [0.0, 0.0, 1.0]])
+        pc_full = pc_full[np.random.choice(range(len(pc_full)), 20000)]
 
-        pc_full, pc_segments, pc_colors = cgn.extract_point_clouds(np.array(depth), K=K)
+        # # plotly(pc_full)
+        # plot(pc_full)
+        # plt.imshow(depth)
 
-        pc_full = pc_full[np.random.choice(range(len(pc_full)), 10000)]
+        pred_grasps_cam, scores, contact_pts, _ = cgn.predict_scene_grasps(sess, pc_full, pc_segments=None)  
 
-        def plot(pc):
-            import matplotlib.pyplot as plt
-            fig = plt.figure()
-            ax = fig.gca(projection='3d')
-            ax.scatter(*pc.T)
-            plt.show()
+        # predict_scene_grasps downsamples the points.Let's find the indices of the original points to learn their labels.
+        # Note: the labels were based on an arbitrary distance epsilon.
+        cp = contact_pts[-1] # output 3D point locations
+        idxs = np.nan * np.ones((len(cp)))
+        for i in range(len(cp)):
+            idx = np.where(np.isclose(orig_pc_full, cp[i]).all(axis=1))
+            idxs[i], = idx
+        idxs = idxs.astype(int)
 
-        def plotly(pc):
-            import plotly.graph_objects as go
-            x,y,z=pc.T
-            marker_data = go.Scatter3d(
-                x=x,y=y,z=z,
-                marker=go.scatter3d.Marker(size=3), 
-                opacity=0.8, 
-                mode='markers'
-            )
-            fig=go.Figure(data=marker_data)
-            fig.show()
+        labels = data['labels'][0].numpy()
+        labels_2048 = labels[idxs].reshape(-1, 1)
+        pos_2048 = orig_pc_full[idxs]
 
-        # plotly(pc_full)
-        plot(pc_full)
-        plt.imshow(depth)
+        df = success_coverage_curve(confs=torch.Tensor(scores[-1]).reshape(-1, 1), pred_grasps=torch.Tensor(pos_2048), gt_grasps=torch.Tensor(pos_2048), gt_labels=torch.Tensor(labels_2048))
 
-        pred_grasps_cam, scores, contact_pts, _ = cgn.predict_scene_grasps(sess, pc_full, pc_segments=pc_segments)  
+        s_c_curves.append(df)
 
+    super_df = pd.concat(s_c_curves).astype(np.float)
+    super_df2 = super_df.groupby('confidence').mean()
+    plot_s_c_curve(super_df2, title="Entire Test Set")
+    plt.show()
     breakpoint()
-    print("cat")
+    print("done")
+
+def plot(pc):
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.scatter(*pc.T)
+    plt.show()
+
+def plotly(pc):
+    import plotly.graph_objects as go
+    x,y,z=pc.T
+    marker_data = go.Scatter3d(
+        x=x,y=y,z=z,
+        marker=go.scatter3d.Marker(size=3), 
+        opacity=0.8, 
+        mode='markers'
+    )
+    fig=go.Figure(data=marker_data)
+    fig.show()
+
+def select_all_grasps(self, contact_pts, contact_conf, max_farthest_points = 150, num_grasps = 200, first_thres = 0.25, second_thres = 0.2, with_replacement=False):
+    """ Overrides GraspEstimator::select_grasps(), so that all grasps are returned without thresholding."""
+    return range(len(contact_pts))
 
 # @Timer(text="model_and_loader: {:0.4f} seconds")
 def model_and_loader(ckpt_dir, check_name, device, yaml_config=None):
@@ -229,7 +252,7 @@ def plot_success_coverage_curve_on_testset():
 
 def load_cgn():
     ########################### Import CGN stuff ###############################
-    sys.path.insert(0, "/home/tim/Research/contact_graspnet/contact_graspnet")
+    sys.path.insert(0, "/scratch/playert/workdir/contact_graspnet/contact_graspnet")
     from contact_grasp_estimator import GraspEstimator
     from visualization_utils import visualize_grasps, show_image
     from data import load_available_input_data
@@ -243,7 +266,7 @@ def load_cgn():
     ########################### Load CGN ###############################
 
     # argparse params from contact_graspnet/inference.py
-    ckpt_dir = '/home/tim/Research/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001'
+    ckpt_dir = '/scratch/playert/workdir/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001'
     forward_passes = 1
     arg_configs = []
 

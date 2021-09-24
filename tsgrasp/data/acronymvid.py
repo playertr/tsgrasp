@@ -62,6 +62,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         tfs_from_cam_to_obj = tfs_from_cam_to_obj[::self.time_decimation_factor,:,:]
 
         pcs = [depth_to_pointcloud(d) for d in depth]
+        orig_pcs = torch.Tensor(pcs)
         labels = [label_frame for label_frame in labels]
 
         ## Downsample points
@@ -92,7 +93,8 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             "pos_control_points" : torch.Tensor(control_pts),
             "sym_pos_control_points" : torch.Tensor(sym_control_pts),
             "single_gripper_points" : torch.Tensor(single_gripper_control_pts),
-            "depth" : torch.Tensor(depth.astype(np.float32)) # np.float32 for endianness
+            "depth" : torch.Tensor(depth.astype(np.float32)), # np.float32 for endianness
+            "all_pos" : orig_pcs
         }
 
         return data
