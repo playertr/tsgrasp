@@ -3,3 +3,7 @@ outputs/
 /data/
 .vscode
 lightning_logs/
+scratch/
+figs/
+tensorboard/
+ckpts/

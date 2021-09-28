@@ -29,6 +29,10 @@ class LitAcronymvidDataset(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn)
 
+    def test_dataloader(self):
+        # TODO: DON'T USE VAL DATASET FOR TESTING!
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn)
+
     def prepare_data(self):
         files = os.listdir(self.data_cfg.dataroot)
         if not all( split in files for split in ['test', 'train']):
