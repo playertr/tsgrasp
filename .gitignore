@@ -4,3 +4,6 @@ outputs/
 .vscode
 lightning_logs/
 scratch/
+figs/
+tensorboard/
+ckpts/
