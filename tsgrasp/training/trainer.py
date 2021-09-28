@@ -7,6 +7,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
 
 from hydra.utils import instantiate
 
+from tsgrasp.utils.viz.viz import GraspAnimationLogger
+
 class Trainer:
     def __init__(self, cfg : DictConfig):
 
@@ -30,9 +32,12 @@ class Trainer:
             wandb_logger.watch(self.pl_model)
             _loggers.append(wandb_logger)
 
+        self.pl_dataset.setup()
+        example_batch = next(iter(self.pl_dataset.train_dataloader()))
         _callbacks = [
             ModelCheckpoint(), 
-            LearningRateMonitor(logging_interval='step')
+            LearningRateMonitor(logging_interval='step'),
+            GraspAnimationLogger(example_batch)
         ]
 
         ## Lightning Trainer
@@ -52,3 +57,6 @@ class Trainer:
 
     def train(self):
         self.trainer.fit(self.pl_model, datamodule=self.pl_dataset)
+
+    def test(self):
+        self.trainer.test(self.pl_model, datamodule=self.pl_dataset)

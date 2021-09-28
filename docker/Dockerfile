@@ -39,7 +39,7 @@ RUN mamba env create -f environment.yml \
     && mamba clean -afy \
     && echo "conda activate tsgrasp" >> ~/.bashrc
 
-ENV TORCH_CUDA_ARCH_LIST="7.5+PTX 8.6+PTX"
+ENV TORCH_CUDA_ARCH_LIST="7.0+PTX 7.5+PTX 8.6+PTX"
 RUN conda activate tsgrasp \
     && mamba install openblas-devel -c anaconda -y \
     && python -m pip install -U git+https://github.com/NVIDIA/MinkowskiEngine  -v --no-deps  --install-option="--blas=openblas"  --install-option="--blas_include_dirs=${CONDA_PREFIX}/include"  --install-option="--force_cuda" \

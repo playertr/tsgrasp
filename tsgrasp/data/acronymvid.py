@@ -83,7 +83,17 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         # cp = grasp_contact_points
         # widths = np.linalg.norm(cp[:,0,:] - cp[:,1,:], axis=1)
 
-        control_pts, sym_control_pts, single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, tfs_from_cam_to_obj, self.root)
+        ## Generate camera-frame grasp poses corresponding to closest points
+        obj_frame_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
+        tfs_from_obj_to_cam = np.array([inverse_homo(t) for t in tfs_from_cam_to_obj])
+
+        # gross numpy broadcasting
+        # https://stackoverflow.com/questions/32171917/copy-2d-array-into-3rd-dimension-n-times-python
+        cam_frame_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_grasp_tfs[np.newaxis,:,:,:])
+        # (30, 2000, 4, 4)
+
+        ## Generate camera-frame gripper control points
+        control_pts, sym_control_pts, single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, cam_frame_grasp_tfs, self.root)
 
         data = {
             "coordinates" : coords4d,
@@ -92,7 +102,8 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             "labels" : torch.Tensor(labels).view(-1, 1),
             "pos_control_points" : torch.Tensor(control_pts),
             "sym_pos_control_points" : torch.Tensor(sym_control_pts),
-            "single_gripper_points" : torch.Tensor(single_gripper_control_pts)
+            "single_gripper_points" : torch.Tensor(single_gripper_control_pts),
+            "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_grasp_tfs)
         }
 
         return data
@@ -128,7 +139,8 @@ def minkowski_collate_fn(list_data):
         "pos_control_points": pos_control_points,
         "sym_pos_control_points": sym_pos_control_points,
         "single_gripper_points": list_data[0]['single_gripper_points'],
-        "gt_grasps_per_batch": gt_grasps_per_batch
+        "gt_grasps_per_batch": gt_grasps_per_batch,
+        "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
     }
 
 # def padded_stack(t_list) -> torch.Tensor:
@@ -205,12 +217,12 @@ def collate_control_points(batch, time, pos_cp_list, sym_pos_cp_list):
             
     return pos_control_points, sym_pos_control_points, gt_grasps_per_batch
 
-def camera_frame_control_pts(pos_grasp_tfs, tfs_from_cam_to_obj, dataroot):
+def camera_frame_control_pts(pos_grasp_tfs, cam_frame_grasp_tfs, dataroot):
     """Compute the control points corresponding to ground truth grasps, in the camera frame.
 
     Args:
         pos_grasp_tfs ([type]): (M, 4, 4) array of object-frame positive ground truth grasp transforms
-        tfs_from_cam_to_obj ([type]): (T, 4, 4) array of object-frame camera poses
+        cam_frame_grasp_tfs ([type]): (T, 4, 4) array of camera-frame grasp poses
         dataroot (str): folder with gripper control point .npz files
 
     Returns:
@@ -218,15 +230,7 @@ def camera_frame_control_pts(pos_grasp_tfs, tfs_from_cam_to_obj, dataroot):
         sym_control_points [type]: camera-frame symmetric (switched 180 deg along wrist) control points
         gripper_control_points [type]: (5,3) array describing the gripper control points in the gripper frame. This is multiplied by predicted grasp transforms to get predicted control points.
     """
-    ## Generate camera-frame grasp poses corresponding to closest points
-    obj_frame_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
-    tfs_from_obj_to_cam = np.array([inverse_homo(t) for t in tfs_from_cam_to_obj])
-
-    # gross numpy broadcasting
-    # https://stackoverflow.com/questions/32171917/copy-2d-array-into-3rd-dimension-n-times-python
-    cam_frame_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_grasp_tfs[np.newaxis,:,:,:])
-    # (30, 2000, 4, 4)
-
+   
     ## Create 3D tensor of (num_good_grasps, 5, 3) control points
     gripper = create_gripper('panda', root_folder=dataroot)
     gripper_control_points = gripper.get_control_point_tensor(max(1, pos_grasp_tfs.shape[0]), use_tf=False) # num_gt_grasps x 5 x 3
