@@ -2,20 +2,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import sys, os
-# ROOT_DIR = "/home/tim/Research/tsgrasp"
 WORK_DIR = "/home/tim/Research"
+# WORK_DIR = "/scratch/playert/workdir"
 ROOT_DIR = os.path.join(WORK_DIR, "tsgrasp")
 sys.path.insert(0, ROOT_DIR)
 
 import hydra
 import torch
 from torch.utils.data import DataLoader
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
 from tqdm import tqdm
 
-from tsgrasp.utils.timer.timer import Timer
 from collections import deque
-from itertools import islice
 
 class TensorMemoize:
     """Decorator to memoize a function with Tensor arguments.
@@ -37,7 +35,6 @@ class TensorMemoize:
         self.memo.appendleft((args, val))
         return val
 
-# @Timer(text="success_from_labels: {:0.4f} seconds")
 def success_from_labels(pred_classes, actual_classes):
     """Return success, as proportion, from ground-truth point labels.
     
@@ -46,7 +43,6 @@ def success_from_labels(pred_classes, actual_classes):
     true_positives = torch.logical_and(all_positives, (pred_classes == actual_classes))
     return true_positives.sum() / all_positives.sum()
 
-# @Timer(text="coverage: {:0.4f} seconds")
 def coverage(pred_classes, pred_grasps, gt_labels, gt_grasps, radius=0.005):
     """Get the proportion of ground truth grasps within epsilon of predicted.
     
@@ -63,22 +59,23 @@ def coverage(pred_classes, pred_grasps, gt_labels, gt_grasps, radius=0.005):
     closest_dists, idxs = dists.min(axis=1)
     return torch.mean((closest_dists < radius).float())
 
-# @Timer(text="distances: {:0.4f} seconds")
 @TensorMemoize
 def distances(grasps1, grasps2):
-    """Finds the L2 distances from points in grasps1 to points in grasps2.
+    """Finds the L2 distances from 3D points in grasps1 to points in grasps2.
 
     Returns a (grasp1.shape[0], grasps3.shape[0]) ndarray."""
 
     diffs = torch.unsqueeze(grasps1, 1) - torch.unsqueeze(grasps2, 0)
     return torch.linalg.norm(diffs, axis=-1)
 
-# @Timer(text="sucess_coverage_curve: {:0.4f} seconds")
 def success_coverage_curve(confs, pred_grasps, gt_grasps, gt_labels):
     """Determine the success and coverage at various threshold confidence values."""
 
     res = []
-    thresholds = torch.linspace(0, 1, 1000)
+    thresholds = torch.linspace(0, 1, 10000)
+
+    # quantiles = torch.linspace(0, 1, 1000)
+    # thresholds = [torch.quantile(confs, q) for q in quantiles]
 
     for t in thresholds:
         pred_classes = confs > t
@@ -92,8 +89,8 @@ def success_coverage_curve(confs, pred_grasps, gt_grasps, gt_labels):
     return pd.DataFrame(res)
 
 @hydra.main(config_path=os.path.join(ROOT_DIR, "conf"), config_name="config")
-def main(cfg : DictConfig):
-    pl_dataset = hydra.utils.instantiate(cfg.data, batch_size=2)
+def main_cgn(cfg : DictConfig):
+    pl_dataset = hydra.utils.instantiate(cfg.data, batch_size=1)
     pl_dataset.prepare_data()
     pl_dataset.setup()
 
@@ -104,13 +101,12 @@ def main(cfg : DictConfig):
         batch_size=1,
         shuffle=True
     )
-
     
     sess, cgn = load_cgn()
     cgn.select_grasps = select_all_grasps # hacky override
     
     s_c_curves = []
-    for i, data in enumerate(dl):
+    for i, data in enumerate(tqdm(dl)):
 
         pc_full = data['positions'][0][0].numpy()
         orig_pc_full = pc_full.copy()
@@ -138,14 +134,71 @@ def main(cfg : DictConfig):
 
         df = success_coverage_curve(confs=torch.Tensor(scores[-1]).reshape(-1, 1), pred_grasps=torch.Tensor(pos_2048), gt_grasps=torch.Tensor(pos_2048), gt_labels=torch.Tensor(labels_2048))
 
+        df.to_csv(f"/home/tim/Research/tsgrasp/scratch/cgn_csvs/{i}.csv")
         s_c_curves.append(df)
 
     super_df = pd.concat(s_c_curves).astype(np.float)
     super_df2 = super_df.groupby('confidence').mean()
-    plot_s_c_curve(super_df2, title="Entire Test Set")
-    plt.show()
-    breakpoint()
+
+    super_df2.to_csv("cgn_sc.csv")
+    # plot_s_c_curve(super_df2, title="Entire Test Set")
+    # plt.show()
+    # breakpoint()
     print("done")
+
+@hydra.main(config_path=os.path.join(ROOT_DIR, "conf"), config_name="config")
+def main_ours(cfg: DictConfig):
+
+    cfg.data.data_cfg.points_per_frame = 45000
+    cfg.training.batch_size=1
+    ckpt = '/home/tim/Research/tsgrasp/ckpts/45000_1/model.ckpt'
+
+    pl_dataset = hydra.utils.instantiate(cfg.data, batch_size=1)
+    pl_dataset.prepare_data()
+    pl_dataset.setup()
+
+    dl = pl_dataset.test_dataloader()
+
+    pl_module = hydra.utils.instantiate(cfg.model, training_cfg=cfg.training)
+    pl_module = pl_module.load_from_checkpoint(ckpt)
+    pl_module.eval()
+
+    s_c_curves = []
+    for i, data in enumerate(tqdm(dl)):
+        # if i < 78:
+        #     continue
+        if i > 128 and i < 140:
+            continue
+
+        out = pl_module._step(data, i)
+
+        class_logits, baseline_dir, approach_dir, grasp_offset = out['outputs']
+
+        positions = data['positions'].reshape(-1, 3)
+        labels=data['labels']
+        idxs = torch.arange(0, 45000) # only take points from first timestep
+        # idxs = np.random.choice(idxs, 2048) # only select 2048 of them, for fair coverage comparison with CGN
+        positions = positions[idxs]
+        class_logits = class_logits[idxs]
+        labels = labels[idxs]
+
+        # device = torch.device('cuda')
+        device = torch.device('cpu')
+        df = success_coverage_curve(confs=class_logits.to(device), pred_grasps=positions.to(device), gt_grasps=positions.to(device), gt_labels=labels.to(device))
+
+        df = df.astype(float)
+        df.to_csv(f"/home/tim/Research/tsgrasp/scratch/our_csvs/{i}.csv")
+        s_c_curves.append(df)
+
+    super_df = pd.concat(s_c_curves).astype(np.float)
+    super_df2 = super_df.groupby('confidence').mean()
+
+    super_df2.to_csv("ours_sc.csv")
+    # plot_s_c_curve(super_df2, title="Entire Test Set")
+    # plt.show()
+    # breakpoint()
+    print("done")
+
 
 def plot(pc):
     import matplotlib.pyplot as plt
@@ -198,59 +251,6 @@ def plot_s_c_curve(df, ax=None, title="Coverage vs. Success"):
 
     return plot
 
-def plot_success_coverage_curve_on_testset():
-    """ Plots success/coverage curve."""
-
-    # Define terms the user might want to change
-    device = torch.device("cuda")
-    # device = torch.device("cpu")
-    # ckpt_dir = "/home/tim/Research/torch-points3d/outputs/2021-08-21/14-39-53"
-    # ckpt_dir = "/home/tim/Research/torch-points3d/outputs/2021-08-24/15-14-53"
-    # ckpt_dir = "/home/tim/Research/torch-points3d/outputs/2021-08-25/09-09-54"
-    ckpt_dir = "/home/tim/Research/torch-points3d/outputs/2021-08-29/00-34-19"
-    check_name = "GraspMinkUNet14A"
-
-    # Create dataloader and model
-    model, loader = model_and_loader(ckpt_dir, check_name, device)
-
-    # Generate success/coverage curves for each batch in the test dataset
-    s_c_curves = []
-    for i, data in enumerate(tqdm(loader)):
-        # Process a single batch
-        with torch.no_grad():
-            model.set_input(data, device)
-            model.forward()
-
-        # At each of the (batch, time, x, y, z) coordinates, get the output
-        # confidence and ground truth label
-        out_coords = model.input.coordinates[model.input.inverse_mapping].detach()#.cpu().numpy()
-        out_confs = torch.sigmoid(model.class_logits.detach())#.cpu().numpy()
-        out_positions = model.positions.detach()#.cpu().numpy()
-        grasp_labels = model.labels.detach()#.cpu().numpy()
-
-        batches = torch.unique(out_coords[:,0]) # batch dim is first column
-        times = torch.unique(out_coords[:,1]) # time is second column
-        for b in batches:
-            for t in times:
-                idxs = torch.where(
-                    torch.logical_and(out_coords[:,0] == b, out_coords[:,1] ==t)
-                )
-                pos = out_positions[idxs]
-                confs = out_confs[idxs]
-                labels = grasp_labels[idxs]
-
-                s_c_curves.append(success_coverage_curve(confs, pos, pos, labels))
-
-    print(s_c_curves[-1])
-    plot_s_c_curve(s_c_curves[-1], title="Last Example")
-
-    super_df = pd.concat(s_c_curves).astype(np.float)
-    super_df2 = super_df.groupby('confidence').mean()
-    plot_s_c_curve(super_df2, title="Entire Test Set")
-    plt.show()
-    breakpoint()
-    print("done")
-
 def load_cgn():
     ########################### Import CGN stuff ###############################
     sys.path.insert(0, os.path.join(WORK_DIR, "contact_graspnet/contact_graspnet"))
@@ -292,19 +292,7 @@ def load_cgn():
 
     return sess, grasp_estimator
 
-
-def test_success_coverage():
-    pass
-def try_cgn(pc_full):
-    pass
-
-    ########################### Run network  ###################################
-
-
-
-
-
 if __name__ == "__main__":
     # plot_success_coverage_curve_on_testset()
-    main()
+    main_ours()
 
