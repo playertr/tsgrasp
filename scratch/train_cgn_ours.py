@@ -12,6 +12,8 @@ from contact_graspnet.contact_graspnet.data import PointCloudReader, load_scene_
 from contact_graspnet.contact_graspnet.summaries import build_summary_ops, build_file_writers
 from contact_graspnet.contact_graspnet.tf_train_ops import load_labels_and_losses, build_train_op
 from contact_graspnet.contact_graspnet.contact_grasp_estimator import GraspEstimator
+import contact_graspnet.contact_graspnet.contact_graspnet as cgn_module
+from tf_train_ops import get_bn_decay
 
 ## Tensorflow imports
 import tensorflow.compat.v1 as tf
@@ -35,9 +37,9 @@ def get_cgn_config():
 
 def get_losses(grasp_estimator: GraspEstimator, global_config: dict) -> typing.Dict[str, tf.Variable]:
     """Build loss operations, with empty placeholders.
-    
-    In the original CGN, the labels are pre-loaded as constants or variables. For 
-    dynamic dataset loading, we switch to placeholders.
+
+    In the original CGN, the labels are pre-loaded as constants or variables.
+    For dynamic dataset loading, we switch to placeholders.
     """
 
     b = 3
@@ -133,10 +135,84 @@ def train_dataloader(batch_size: int) -> LitAcronymvidDataset:
     )
     return dl
 
+class CGNWrapper:
+
+    def __init__(self, global_config, batch_size=3, num_input_points=20000, num_target_points=2048):
+        self.global_config = global_config
+        self.input_placeholders = self.placeholder_inputs(
+            batch_size=batch_size,
+            num_input_points=num_input_points,
+            input_normals=False
+        )
+        self.step = tf.Variable(0)
+        self.end_points = cgn_module.get_model(
+            point_cloud = self.input_placeholders['pointclouds_pl'],
+            is_training = self.input_placeholders['is_training_pl'],
+            global_config = self.global_config,
+            bn_decay = get_bn_decay(self.step, global_config['OPTIMIZER'])
+        )
+        self.data_placeholders = self.placeholder_data(
+            b = batch_size,
+            N = num_target_points
+        )
+        self.losses = cgn_module.get_losses(
+            self.end_points['pred_points'],
+            self.end_points,
+            self.data_placeholders['dir_labels_pc_cam'],
+            self.data_placeholders['offset_labels_pc'],
+            self.data_placeholders['grasp_success_labels_pc'],
+            self.data_placeholders['approach_labels_pc_cam'],
+            global_config
+        )
+
+    def placeholder_inputs(self, batch_size, num_input_points, input_normals):
+        """
+        Creates placeholders for input pointclouds and training/eval mode 
+
+        Arguments:
+            batch_size {int} -- batch size
+            num_input_points {int} -- number of input points to the network (default: 20000)
+
+        Keyword Arguments:
+            input_normals {bool} -- whether to use normals as input (default: {False})
+
+        Returns:
+            dict[str:tf.placeholder] -- dict of placeholders
+        """
+        pl_dict = {}
+        dim = 6 if input_normals else 3
+        pl_dict['pointclouds_pl'] = tf.placeholder(
+            tf.float32, shape=(batch_size, num_input_points, dim)
+        )
+        pl_dict['is_training_pl'] = tf.placeholder(tf.bool, shape=())
+
+        return pl_dict
+    
+    def placeholder_data(self, b, N):
+        """ Create placeholders for the information needed to compute loss,
+        such as the camera-frame contact point positions."""
+
+        return {
+            'grasp_success_labels_pc': tf.placeholder(
+                tf.float32, shape=(b, N), name='grasp_success_labels_pc'
+            ),
+            'offset_labels_pc': tf.placeholder(
+                tf.float32, shape=(b, N, 10), name='offset_labels_pc'
+            ),
+            'approach_labels_pc_cam': tf.placeholder(
+                tf.float32, shape=(b, N, 3), name='approach_labels_pc_cam'
+            ),
+            'dir_labels_pc_cam':  tf.placeholder(
+            tf.float32, shape=(b, N, 3), name='dir_labels_pc_cam'
+            )
+        }
+
 def train(global_config):
 
     dl = train_dataloader(batch_size = 3)
     with tf.Graph().as_default(): # create a new graph with this scope
+
+        cgn = CGNWrapper(global_config)
 
         grasp_estimator = GraspEstimator(global_config)
 
@@ -193,6 +269,11 @@ def train(global_config):
             ops['dir_labels_pc_cam']: f.normalize(torch.rand(3, 2048, 3), dim=2, p=2), # TODO: unrandom
             ops['offset_labels_pc']: torch.rand(3, 2048, 10) # TODO: unrandom
         }
+
+        writer = tf.summary.FileWriter('logs', sess.graph)
+        print(sess.run(ops['adds_loss'])) 
+        writer.close()
+
         (   
             # scene_idx, 
             step, 
@@ -215,6 +296,7 @@ def train(global_config):
             ops['adds_gt2pred_loss']], 
             feed_dict=feed_dict
         )
+
 
         print("cat")
         # Compute loss
