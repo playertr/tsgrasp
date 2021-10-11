@@ -10,10 +10,9 @@ import contact_graspnet.pointnet2.utils
 from contact_graspnet.contact_graspnet import config_utils
 from contact_graspnet.contact_graspnet.data import PointCloudReader, load_scene_contacts, center_pc_convert_cam
 from contact_graspnet.contact_graspnet.summaries import build_summary_ops, build_file_writers
-from contact_graspnet.contact_graspnet.tf_train_ops import load_labels_and_losses, build_train_op
+from contact_graspnet.contact_graspnet.tf_train_ops import load_labels_and_losses, build_train_op, get_bn_decay
 from contact_graspnet.contact_graspnet.contact_grasp_estimator import GraspEstimator
 import contact_graspnet.contact_graspnet.contact_graspnet as cgn_module
-from tf_train_ops import get_bn_decay
 
 ## Tensorflow imports
 import tensorflow.compat.v1 as tf
@@ -26,72 +25,11 @@ tf.config.experimental.set_memory_growth(physical_devices[0], True)
 from tsgrasp.data.lit_acronymvid import LitAcronymvidDataset
 import torch
 
-def get_trainer():
-    pass
-
 def get_cgn_config():
     cfg = config_utils.load_config(
         checkpoint_dir="/home/tim/Research/tsgrasp/ckts/cgn_ckpts"
     )
     return cfg
-
-def get_losses(grasp_estimator: GraspEstimator, global_config: dict) -> typing.Dict[str, tf.Variable]:
-    """Build loss operations, with empty placeholders.
-
-    In the original CGN, the labels are pre-loaded as constants or variables.
-    For dynamic dataset loading, we switch to placeholders.
-    """
-
-    b = 3
-    N = 2048
-
-    grasp_success_labels_pc = tf.placeholder(tf.float32, shape=(b, N), name='grasp_success_labels_pc')
-    offset_labels_pc        = tf.placeholder(tf.float32, shape=(b, N, 10), name='offset_labels_pc')
-    approach_labels_pc_cam  = tf.placeholder(tf.float32, shape=(b, N, 3), name='approach_labels_pc_cam')
-    dir_labels_pc_cam       = tf.placeholder(tf.float32, shape=(b, N, 3), name='dir_labels_pc_cam')
-    
-    end_points = grasp_estimator.model_ops['end_points']
-    target_point_cloud = end_points['pred_points']
-
-    losses =  grasp_estimator._model_func.get_losses(
-        pointclouds_pl          = target_point_cloud,
-        end_points              = grasp_estimator.model_ops['end_points'], 
-        dir_labels_pc_cam       = dir_labels_pc_cam, 
-        offset_labels_pc        = offset_labels_pc, 
-        grasp_success_labels_pc = grasp_success_labels_pc, 
-        approach_labels_pc_cam  = approach_labels_pc_cam, 
-        global_config           = global_config
-    )
-
-    dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_loss_gt2pred = losses
-
-    total_loss = 0
-    if global_config['MODEL']['pred_contact_base']:
-        total_loss += global_config['OPTIMIZER']['dir_cosine_loss_weight'] * dir_loss
-    if global_config['MODEL']['pred_contact_success']:
-        total_loss += global_config['OPTIMIZER']['score_ce_loss_weight'] * bin_ce_loss
-    if global_config['MODEL']['pred_contact_offset']:
-        total_loss += global_config['OPTIMIZER']['offset_loss_weight'] * offset_loss
-    if global_config['MODEL']['pred_contact_approach']:
-        total_loss += global_config['OPTIMIZER']['approach_cosine_loss_weight'] * approach_loss
-    if global_config['MODEL']['pred_grasps_adds']:
-        total_loss += global_config['OPTIMIZER']['adds_loss_weight'] * adds_loss
-    if global_config['MODEL']['pred_grasps_adds_gt2pred']:
-        total_loss += global_config['OPTIMIZER']['adds_gt2pred_loss_weight'] * adds_loss_gt2pred
-
-    return {
-        'loss': total_loss,
-        'dir_loss': dir_loss,
-        'bin_ce_loss': bin_ce_loss,
-        'offset_loss': offset_loss,
-        'approach_loss': approach_loss,
-        'adds_loss': adds_loss,
-        'adds_gt2pred_loss': adds_loss_gt2pred,
-        'grasp_success_labels_pc': grasp_success_labels_pc,
-        'approach_labels_pc_cam': approach_labels_pc_cam,
-        'dir_labels_pc_cam': dir_labels_pc_cam,
-        'offset_labels_pc': offset_labels_pc
-    }
 
 def train_dataloader(batch_size: int) -> LitAcronymvidDataset:
     from hydra import compose, initialize
@@ -139,33 +77,69 @@ class CGNWrapper:
 
     def __init__(self, global_config, batch_size=3, num_input_points=20000, num_target_points=2048):
         self.global_config = global_config
-        self.input_placeholders = self.placeholder_inputs(
+        self.input_pl = self.placeholder_inputs(
             batch_size=batch_size,
             num_input_points=num_input_points,
             input_normals=False
         )
         self.step = tf.Variable(0)
         self.end_points = cgn_module.get_model(
-            point_cloud = self.input_placeholders['pointclouds_pl'],
-            is_training = self.input_placeholders['is_training_pl'],
+            point_cloud = self.input_pl['pointclouds_pl'],
+            is_training = self.input_pl['is_training_pl'],
             global_config = self.global_config,
             bn_decay = get_bn_decay(self.step, global_config['OPTIMIZER'])
         )
-        self.data_placeholders = self.placeholder_data(
+        self.loss_pl = self.placeholder_data(
             b = batch_size,
             N = num_target_points
         )
-        self.losses = cgn_module.get_losses(
+        self.losses = self.get_losses()
+        self.train_op = build_train_op(self.losses['loss'], self.step, global_config)
+
+    def get_losses(self):
+        (
+            dir_loss, 
+            bin_ce_loss, 
+            offset_loss, 
+            approach_loss, 
+            adds_loss, 
+            adds_loss_gt2pred 
+        )= cgn_module.get_losses(
             self.end_points['pred_points'],
             self.end_points,
-            self.data_placeholders['dir_labels_pc_cam'],
-            self.data_placeholders['offset_labels_pc'],
-            self.data_placeholders['grasp_success_labels_pc'],
-            self.data_placeholders['approach_labels_pc_cam'],
-            global_config
+            self.loss_pl['dir_labels_pc_cam'],
+            self.loss_pl['offset_labels_pc'],
+            self.loss_pl['grasp_success_labels_pc'],
+            self.loss_pl['approach_labels_pc_cam'],
+            self.global_config
         )
 
-    def placeholder_inputs(self, batch_size, num_input_points, input_normals):
+        total_loss = 0
+        if self.global_config['MODEL']['pred_contact_base']:
+            total_loss += self.global_config['OPTIMIZER']['dir_cosine_loss_weight'] * dir_loss
+        if self.global_config['MODEL']['pred_contact_success']:
+            total_loss += self.global_config['OPTIMIZER']['score_ce_loss_weight'] * bin_ce_loss
+        if self.global_config['MODEL']['pred_contact_offset']:
+            total_loss += self.global_config['OPTIMIZER']['offset_loss_weight'] * offset_loss
+        if self.global_config['MODEL']['pred_contact_approach']:
+            total_loss += self.global_config['OPTIMIZER']['approach_cosine_loss_weight'] * approach_loss
+        if self.global_config['MODEL']['pred_grasps_adds']:
+            total_loss += self.global_config['OPTIMIZER']['adds_loss_weight'] * adds_loss
+        if self.global_config['MODEL']['pred_grasps_adds_gt2pred']:
+            total_loss += self.global_config['OPTIMIZER']['adds_gt2pred_loss_weight'] * adds_loss_gt2pred
+
+        return {
+            'loss': total_loss,
+            'dir_loss': dir_loss,
+            'bin_ce_loss': bin_ce_loss,
+            'offset_loss': offset_loss,
+            'approach_loss': approach_loss,
+            'adds_loss': adds_loss,
+            'adds_gt2pred_loss': adds_loss_gt2pred
+        }
+
+    @staticmethod
+    def placeholder_inputs(batch_size, num_input_points, input_normals):
         """
         Creates placeholders for input pointclouds and training/eval mode 
 
@@ -188,7 +162,8 @@ class CGNWrapper:
 
         return pl_dict
     
-    def placeholder_data(self, b, N):
+    @staticmethod
+    def placeholder_data(b, N):
         """ Create placeholders for the information needed to compute loss,
         such as the camera-frame contact point positions."""
 
@@ -214,16 +189,6 @@ def train(global_config):
 
         cgn = CGNWrapper(global_config)
 
-        grasp_estimator = GraspEstimator(global_config)
-
-        # Build inference operations
-        ops = grasp_estimator.build_network()
-        loss_ops = get_losses(grasp_estimator, global_config)
-
-        # Build loss operations and training op
-        ops.update(loss_ops)
-        ops['train_op'] =  build_train_op(ops['loss'], ops['step'], global_config)
-        
         # Add ops to save and restore all the variables.
         saver = tf.train.Saver(save_relative_paths=True, keep_checkpoint_every_n_hours=4)
 
@@ -231,6 +196,9 @@ def train(global_config):
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
+        # config = tf.ConfigProto(
+        #     device_count = {'GPU': 0}
+        # )
         sess = tf.Session(config=config)
         # from tensorflow.python import debug as tf_debug
         # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
@@ -241,39 +209,26 @@ def train(global_config):
         # summary_ops = build_summary_ops(ops, sess, global_config)
 
         # Init/Load weights
-        log_dir = "logs"
-        grasp_estimator.load_weights(sess, saver, log_dir, mode='train')
-        file_writers = build_file_writers(sess, log_dir)
+        # TODO: add weight loading
+        sess.run(tf.global_variables_initializer())
 
     ## Run training op
 
-    def log_string(s):
-        print(s)
-        
-    num_train_samples = 10000 # TODO fix made-up number
-    cur_epoch = sess.run(ops['step']) // num_train_samples
-    for epoch in range(cur_epoch, global_config['OPTIMIZER']['max_epoch']):
-        log_string('**** EPOCH %03d ****' % (epoch))
+    for i, data in enumerate(dl):
+        print(f"**** Iteration {i} ****")
         # Inference on a batch
         data = next(iter(dl))
 
         import torch.nn.functional as f
         feed_dict = {
-            ops['pointclouds_pl']: data['positions'][:, 0, range(20000)], # TODO: use proper idxs
-            ops['cam_poses_pl']: data['cam_frame_pos_grasp_tfs'][0][0][:3], # TODO: use proper tf
-            ops['scene_idx_pl']: 0,
-            ops['is_training_pl']: True,
+            cgn.input_pl['pointclouds_pl']: data['positions'][:, 0, range(20000)], # TODO: use proper idxs
+            cgn.input_pl['is_training_pl']: True,
             # variables that we turned into placeholders
-            ops['grasp_success_labels_pc']: data['labels'].reshape(3, 10, -1)[:, 0, range(2048)], # TODO: use proper 2048 labeled points
-            ops['approach_labels_pc_cam']: f.normalize(torch.rand(3, 2048, 3), dim=2, p=2), # TODO: unrandom
-            ops['dir_labels_pc_cam']: f.normalize(torch.rand(3, 2048, 3), dim=2, p=2), # TODO: unrandom
-            ops['offset_labels_pc']: torch.rand(3, 2048, 10) # TODO: unrandom
+            cgn.loss_pl['grasp_success_labels_pc']: data['labels'].reshape(3, 10, -1)[:, 0, range(2048)], # TODO: use proper 2048 labeled points
+            cgn.loss_pl['approach_labels_pc_cam']: f.normalize(torch.rand(3, 2048, 3), dim=2, p=2), # TODO: unrandom
+            cgn.loss_pl['dir_labels_pc_cam']: f.normalize(torch.rand(3, 2048, 3), dim=2, p=2), # TODO: unrandom
+            cgn.loss_pl['offset_labels_pc']: torch.rand(3, 2048, 10) # TODO: unrandom
         }
-
-        writer = tf.summary.FileWriter('logs', sess.graph)
-        print(sess.run(ops['adds_loss'])) 
-        writer.close()
-
         (   
             # scene_idx, 
             step, 
@@ -285,19 +240,30 @@ def train(global_config):
             adds_loss, 
             adds_gt2pred_loss
         ) = sess.run([
-            # ops['scene_idx'], 
-            ops['step'], 
-            ops['loss'], 
-            ops['dir_loss'], 
-            ops['bin_ce_loss'], 
-            # ops['offset_loss'], 
-            # ops['approach_loss'], 
-            ops['adds_loss'],
-            ops['adds_gt2pred_loss']], 
+            cgn.train_op,
+            cgn.step, 
+            cgn.losses['loss'], 
+            cgn.losses['dir_loss'], 
+            cgn.losses['bin_ce_loss'], 
+            cgn.losses['adds_loss'],
+            cgn.losses['adds_gt2pred_loss']], 
             feed_dict=feed_dict
         )
 
-
+        print(
+            (   
+            # scene_idx, 
+            step, 
+            loss_val, 
+            dir_loss, 
+            bin_ce_loss, 
+            # offset_loss, 
+            # approach_loss,
+            adds_loss, 
+            adds_gt2pred_loss
+        )
+        )
+        breakpoint()
         print("cat")
         # Compute loss
 
@@ -306,7 +272,7 @@ def train(global_config):
         # Log, etc.
 
 def main():
-    trainer = get_trainer()
+
     ge_global_config = get_cgn_config()
     ge_global_config['MODEL']['model'] = 'contact_graspnet.contact_graspnet.contact_graspnet'
     
