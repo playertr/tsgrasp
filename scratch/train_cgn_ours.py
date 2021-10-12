@@ -14,6 +14,8 @@ from contact_graspnet.contact_graspnet.tf_train_ops import load_labels_and_losse
 from contact_graspnet.contact_graspnet.contact_grasp_estimator import GraspEstimator
 import contact_graspnet.contact_graspnet.contact_graspnet as cgn_module
 
+from contact_graspnet.pointnet2.tf_ops.grouping.tf_grouping import group_point
+
 ## Tensorflow imports
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
@@ -62,7 +64,8 @@ def train_dataloader(batch_size: int) -> LitAcronymvidDataset:
             "pos_control_points": pos_control_points,
             "sym_pos_control_points": sym_pos_control_points,
             "gt_grasps_per_batch": gt_grasps_per_batch,
-            "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
+            "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data],
+            "contact_pts_mesh": [d["contact_pts_mesh"] for d in list_data]
         }
 
     dl = DataLoader(
@@ -89,25 +92,26 @@ class CGNWrapper:
             global_config = self.global_config,
             bn_decay = get_bn_decay(self.step, global_config['OPTIMIZER'])
         )
+        self.predata_pl = self.placeholder_predata(b=3, N=2048, M=4000)
         (
             dir_labels_pc_cam,
             offset_labels_pc,
             grasp_success_labels_pc,
             approach_labels_pc_cam
-        ) = cgn_module.get_model(
-            pos_contacts_pts_mesh=unknown,
-            pos_contact_dirs_mesh=unknown,
-            pos_contact_approaches_mesh=unkown,
-            pos_finger_diffs=unkown,
+        ) = self.compute_labels(
+            pos_contacts_pts_mesh=self.predata_pl['pos_contact_pts_mesh'],
+            pos_contact_dirs_mesh=self.predata_pl['pos_contact_dirs_mesh'],
+            pos_contact_approaches_mesh=self.predata_pl['pos_contact_approaches_mesh'],
+            pos_finger_diffs=self.predata_pl['pos_finger_diffs'],
             pc_cam_pl=self.input_pl['pointclouds_pl'],
-            camera_pose_pl=unknown,
+            camera_pose_pl=self.predata_pl['camera_pos_pl'],
             global_config=global_config
         )
         self.loss_pl = self.placeholder_data(
             b = batch_size,
             N = num_target_points
         )
-        self.losses = self.get_losses()
+        self.losses = self.get_losses(dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam)
         self.train_op = build_train_op(self.losses['loss'], self.step, global_config)
 
     def get_losses(self):
@@ -175,7 +179,28 @@ class CGNWrapper:
         pl_dict['is_training_pl'] = tf.placeholder(tf.bool, shape=())
 
         return pl_dict
-    
+        
+    @staticmethod
+    def placeholder_predata(b, N, M):
+        """b batches, N camera points, M contact points"""
+        return {
+            "pos_contact_pts_mesh": tf.placeholder(
+                tf.float32, shape=(M,3)
+            ),
+            "pos_contact_dirs_mesh": tf.placeholder(
+                tf.float32, shape=(M,3)
+            ),
+            "pos_contact_approaches_mesh": tf.placeholder(
+                tf.float32, shape=(M,3)
+            ),
+            "pos_finger_diffs": tf.placeholder(
+                tf.float32, shape=(M,1)
+            ),
+            "camera_pose_pl": tf.placeholder(
+                tf.float32, shape=(b,4,4)
+            )
+        }
+
     @staticmethod
     def placeholder_data(b, N):
         """ Create placeholders for the information needed to compute loss,
@@ -196,6 +221,7 @@ class CGNWrapper:
             )
         }
 
+    @staticmethod
     def compute_labels(pos_contact_pts_mesh, pos_grasp_tfs_cam, pos_finger_diffs, pc_cam_pl, camera_pose_pl, global_config):
         """
         Project grasp labels defined on meshes onto rendered point cloud from a camera pose via nearest neighbor contacts within a maximum radius. 
@@ -229,10 +255,11 @@ class CGNWrapper:
             tf.expand_dims(pos_finger_diffs,0), xyz_cam.shape[0], axis=0)
 
         # Repeat contact dirs along batch dimension
-        pad_homog2 = tf.ones((xyz_cam.shape[0], pos_contact_dirs_mesh.shape[0], 1))
+
 
         # pos_grasp_tfs_cam {tf.placeholder} -- positive grasp transforms in the camera frame (bxM/2x4x4)
-        pos_contact_dirs_mesh = pos_grasp_tfs_cam[:,:, :3, 0]
+        contact_point_dirs_batch = pos_grasp_tfs_cam[:,:, :3, 0]
+        # The contact direction IS the pose transform's x axis, right?
         # contact_point_dirs_batch = tf.keras.backend.repeat_elements(
         #     tf.expand_dims(pos_contact_dirs_mesh,0), 
         #     xyz_cam.shape[0], 
@@ -245,7 +272,7 @@ class CGNWrapper:
             tf.transpose(camera_pose_pl[:,:3,:3], perm=[0, 2, 1])
         )[:,:,:3]
 
-        # Repeat approach dirs along batch dimension
+        # Repeat approach dirs along batch dimensions
         pos_contact_approaches_batch = pos_grasp_tfs_cam[:,:,:3,2]
         # pos_contact_approaches_batch = tf.keras.backend.repeat_elements(
         #     tf.expand_dims(pos_contact_approaches_mesh,0), 
@@ -266,6 +293,9 @@ class CGNWrapper:
             axis=0
         )
         # Transform contact points into camera frame
+        pad_homog2 = tf.ones(
+            (xyz_cam.shape[0], contact_point_batch_mesh.shape[1], 1)
+        )
         contact_point_batch_cam = tf.matmul(
             tf.concat([contact_point_batch_mesh, pad_homog2], 2), 
             tf.transpose(camera_pose_pl, perm=[0, 2, 1])
