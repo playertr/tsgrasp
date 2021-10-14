@@ -37,8 +37,10 @@ class Trainer:
         _callbacks = [
             ModelCheckpoint(), 
             LearningRateMonitor(logging_interval='step'),
-            GraspAnimationLogger(example_batch)
         ]
+
+        if cfg.training.save_animations:
+            GraspAnimationLogger(example_batch)
 
         ## Lightning Trainer
         if "resume_from_checkpoint" in cfg.training:

@@ -5,6 +5,8 @@ data_len: 50
 max_epochs: 4
 # resume_from_checkpoint: "/home/tim/Research/tsgrasp/outputs/2021-09-17/11-32-05/default/0/checkpoints/epoch=1-step=31.ckpt"
 
+save_animations: False
+
 use_wandb: False
 wandb:
   project: "TSGrasp"
