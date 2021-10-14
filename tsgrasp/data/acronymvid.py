@@ -127,7 +127,8 @@ def minkowski_collate_fn(list_data):
     # padded_stack(pos_cp_list)
 
     ## Each batch may have different numbers of ground truth grasps, resulting in ragged tensors. We require even, rectangular tensors for calculating the ADD-S loss, so we collate them into rectangular tensors.
-    pos_control_points, sym_pos_control_points, gt_grasps_per_batch = collate_control_points(
+    pos_control_points, sym_pos_control_points, gt_grasps_per_batch = \
+        collate_control_points(
         batch = torch.arange(len(list_data)),
         time = torch.stack([d["coordinates"][:,0] for d in list_data]),
         pos_cp_list = [d["pos_control_points"] for d in list_data],
