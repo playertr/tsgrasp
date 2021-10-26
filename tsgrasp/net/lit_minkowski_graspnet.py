@@ -13,8 +13,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.save_hyperparameters()
         self.model = MinkowskiGraspNet(model_cfg)
         self.loss = self.model.loss
-        self.learning_rate = 0.001 # TODO pass as cfg
-        self.data_len = training_cfg.data_len
+        self.learning_rate = training_cfg.optimizer.learning_rate
+        self.lr_decay = training_cfg.optimizer.lr_decay
 
         self.train_pt_acc = torchmetrics.Accuracy()
         self.val_pt_acc = torchmetrics.Accuracy()
@@ -27,15 +27,9 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             }],
             lr=self.learning_rate
         )
-        warmup_factor = 1.0 / 1000
-        warmup_iters = min(1000, self.data_len - 1)
-        def fun(iter_num: int) -> float:
-            if iter_num >= warmup_iters:
-                return 1
-            alpha = float(iter_num) / warmup_iters
-            return warmup_factor * (1 - alpha) + alpha
         lr_scheduler = {
-            'scheduler': torch.optim.lr_scheduler.LambdaLR(optimizer, fun),
+            'scheduler': torch.optim.lr_scheduler.ExponentialLR(optimizer, 
+                self.lr_decay),
             'name': 'learning_rate'
         }
         return [optimizer], [lr_scheduler]
