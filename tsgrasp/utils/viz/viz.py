@@ -11,6 +11,7 @@ from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
 import MinkowskiEngine as ME
 import imageio
 import os
+import wandb
 
 class GraspAnimationLogger(Callback):
     def __init__(self, example_batch: dict):
@@ -26,9 +27,14 @@ class GraspAnimationLogger(Callback):
         outputs = pl_module.model.forward(stensor)
         pts = self.batch['positions'].to(pl_module.device)
 
-        animate_grasps_from_outputs(outputs, pts)
+        animations = animate_grasps_from_outputs(outputs, pts)
 
-    
+        ## Send to C L O U D
+        trainer.logger.experiment.log({
+            "val/examples": [wandb.Image(a) 
+                              for a in animations]
+            })
+
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         pts = batch['positions'].to(pl_module.device)
         outputs = [item.to(pl_module.device) for item in outputs['outputs']]
@@ -37,6 +43,7 @@ class GraspAnimationLogger(Callback):
 def animate_grasps_from_outputs(outputs, pts, name=""):
     """
     Save GIFs overlaying the predicted grasps on the points clouds.
+    Returns a list of CPU tensor animations.
 
     outputs: raw grasp parameters from module. (N_BATCH*N_TIME*N_PT, W_i)
     pts: point cloud. (N_BATCH, N_TIME, N_PT, 3)
@@ -64,9 +71,16 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
 
     os.makedirs('figs', exist_ok=True)
+    animations = []
     for batch_dim in range(len(pts)):
-        ims = animate_grasps(pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), confs[batch_dim].cpu().numpy())
+        ims = animate_grasps(
+            pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), 
+            confs[batch_dim].cpu().numpy()
+        )
         imageio.mimsave(f"figs/{name}_{batch_dim}.gif", ims)
+        animations.append(ims)
+
+    return animations
 
 def animate_grasps(pts, grasp_tfs, confs, pitches=None, res=(1080, 1080)):
     """
