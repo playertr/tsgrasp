@@ -19,11 +19,6 @@ class LitAcronymvidDataset(pl.LightningDataModule):
             self.dataset_train = AcronymVidDataset(self.data_cfg, split="train")
             self.dataset_val   = AcronymVidDataset(self.data_cfg, split="test")
 
-            if "subset_factor" in self.data_cfg:
-                self.dataset_train = Subset(
-                    self.dataset_train, 
-                    indices=range(0, len(self.dataset_train), self.data_cfg.subset_factor))
-
     def train_dataloader(self):
         return DataLoader(self.dataset_train, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn, sampler=RandomSampler(self.dataset_train, int(len(self.dataset_train) / self.data_cfg.subset_factor)))
 
