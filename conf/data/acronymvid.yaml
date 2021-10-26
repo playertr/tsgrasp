@@ -10,4 +10,4 @@ data_cfg:
   num_workers: 4
 
   time_decimation_factor: 3
-  subset_factor: 64
+  subset_factor: 1
