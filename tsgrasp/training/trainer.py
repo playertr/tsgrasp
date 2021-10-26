@@ -7,8 +7,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
 
 from hydra.utils import instantiate
 
-from tsgrasp.utils.viz.viz import GraspAnimationLogger
-
 class Trainer:
     def __init__(self, cfg : DictConfig):
 
@@ -37,8 +35,11 @@ class Trainer:
         _callbacks = [
             ModelCheckpoint(), 
             LearningRateMonitor(logging_interval='step'),
-            GraspAnimationLogger(example_batch)
         ]
+
+        if cfg.training.save_animations:
+            from tsgrasp.utils.viz.viz import GraspAnimationLogger
+            GraspAnimationLogger(example_batch)
 
         ## Lightning Trainer
         if "resume_from_checkpoint" in cfg.training:

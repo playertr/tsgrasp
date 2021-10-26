@@ -133,7 +133,23 @@ def parallel_add_s_loss(approach_dir, baseline_dir, positions, pos_control_point
     return loss
 
 def sequential_add_s_loss(approach_dir, baseline_dir, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points, labels, logits, grasp_width) -> torch.Tensor:
-    """Un-parallelized implementation of add_s_loss. Uses a loop instead of batch/time parallelization to reduce memory requirements. """
+    """Un-parallelized implementation of add_s_loss. Uses a loop instead of batch/time parallelization to reduce memory requirements. 
+
+    Args:
+        approach_dir (torch.Tensor): (b*T*n_pred_grasp, 3) gripper approach direction
+        baseline_dir (torch.Tensor): (b*T*n_pred_grasp, 3) gripper baseline direction
+        positions (torch.Tensor): (b, T, n_pred_grasp, 3) position of contact point
+        pos_control_points (torch.Tensor): (b, T, n_gt_grasp, 5, 3) control point tensors
+        sym_pos_control_points (torch.Tensor): (b, T, n_gt_grasp, 5, 3) symmetric control point tensors
+        gt_grasps_per_batch (List[int]): numbers of ground truth grasps in each batch
+        single_gripper_points (torch.Tensor): (5, 3) control point tensor for a single grasp
+        labels (torch.Tensor): (b*T*n_pred_grasp, 1) ground truth contact point classifications
+        logits (torch.Tensor): (b*T*n_pred_grasp, 1) network contact point confidence logits
+        grasp_width ([type]): (b*T*n_pred_grasp, 1) network grasp width/offset predictions
+
+    Returns:
+        torch.Tensor: [description]
+    """
 
     ## Package each grasp parameter P into a regular, dense Tensor of shape
     # (BATCH, TIME, N_PRED_GRASP, *P.shape)
@@ -185,11 +201,17 @@ def sequential_add_s_loss(approach_dir, baseline_dir, positions, pos_control_poi
     return loss / (n_batch * n_time)
 
 def approx_min_dists(pred_cp, gt_cp):
-    """Find the approximate minimum average distance of each control-point-tensor in `pred_cp` from any of the control-point-tensors in `gt_cp`.
+    """Find the approximate minimum average distance of each
+    control-point-tensor in `pred_cp` from any of the control-point-tensors in
+    `gt_cp`.
 
-    Approximates distance by finding the mean three-dimensional coordinate of each tensor, so that the M x N pairwise lookup takes up one-fifth of the memory as comparing all control-point-tensors in full, avoiding the creation of a (B, T, N, M, 5, 3) matrix.
+    Approximates distance by finding the mean three-dimensional coordinate of
+    each tensor, so that the M x N pairwise lookup takes up one-fifth of the
+    memory as comparing all control-point-tensors in full, avoiding the creation
+    of a (B, T, N, M, 5, 3) matrix.
     
-    Once the mean-closest tensor is found for each point, the full matrix L2 distance is returned.
+    Once the mean-closest tensor is found for each point, the full matrix L2
+    distance is returned.
 
     Args:
         pred_cp (torch.Tensor): (B, T, N, 5, 3) Tensor of control points
@@ -248,6 +270,16 @@ def control_point_tensor(approach_dirs, baseline_dirs, positions, grasp_widths, 
 
 def build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_width, gripper_depth=0.1034):
     """Calculate the SE(3) transforms corresponding to each predicted coord/approach/baseline/grasp_width grasp.
+
+    Args:
+        contact_pts ([type]): (b, T, n_pred_grasp, 3) contact points predicted
+        baseline_dir ([type]): (b, T, n_pred_grasp, 3) gripper baseline directions
+        approach_dir ([type]): (b, T, n_pred_grasp, 3) gripper approach directions
+        grasp_width ([type]): (b, T, n_pred_grasp, 3) gripper width
+        gripper_depth (float, optional): depth of gripper. Defaults to 0.1034.
+
+    Returns:
+        pred_grasp_tfs (torch.Tensor): (b, T, n_pred_grasp, 4, 4) homogeneous grasp poses.
     """
     grasps_R = torch.stack([baseline_dir, torch.cross(approach_dir, baseline_dir), approach_dir], axis=4)
     grasps_t = contact_pts + grasp_width/2 * baseline_dir - gripper_depth * approach_dir

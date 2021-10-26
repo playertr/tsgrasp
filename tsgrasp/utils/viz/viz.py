@@ -10,6 +10,7 @@ import numpy as np
 from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
 import MinkowskiEngine as ME
 import imageio
+import os
 
 class GraspAnimationLogger(Callback):
     def __init__(self, example_batch: dict):
@@ -62,6 +63,7 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     ## Construct the 4x4 grasp poses
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
 
+    os.makedirs('figs', exist_ok=True)
     for batch_dim in range(len(pts)):
         ims = animate_grasps(pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), confs[batch_dim].cpu().numpy())
         imageio.mimsave(f"figs/{name}_{batch_dim}.gif", ims)
