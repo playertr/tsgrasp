@@ -39,7 +39,7 @@ class Trainer:
 
         if cfg.training.save_animations:
             from tsgrasp.utils.viz.viz import GraspAnimationLogger
-            GraspAnimationLogger(example_batch)
+            _callbacks.append(GraspAnimationLogger(example_batch))
 
         ## Lightning Trainer
         if "resume_from_checkpoint" in cfg.training:

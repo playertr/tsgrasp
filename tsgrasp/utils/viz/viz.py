@@ -27,12 +27,12 @@ class GraspAnimationLogger(Callback):
         outputs = pl_module.model.forward(stensor)
         pts = self.batch['positions'].to(pl_module.device)
 
-        animations = animate_grasps_from_outputs(outputs, pts)
+        gif_paths = animate_grasps_from_outputs(outputs, pts)
 
         ## Send to C L O U D
-        trainer.logger.experiment.log({
-            "val/examples": [wandb.Image(a) 
-                              for a in animations]
+        wandb.log({
+            "val/examples": [wandb.Image(path) 
+                              for path in gif_paths]
             })
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
@@ -71,16 +71,17 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
 
     os.makedirs('figs', exist_ok=True)
-    animations = []
+    gif_paths = []
     for batch_dim in range(len(pts)):
         ims = animate_grasps(
             pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), 
             confs[batch_dim].cpu().numpy()
         )
-        imageio.mimsave(f"figs/{name}_{batch_dim}.gif", ims)
-        animations.append(ims)
+        path = f"figs/{name}_{batch_dim}.gif"
+        imageio.mimsave(path, ims)
+        gif_paths.append(path)
 
-    return animations
+    return gif_paths
 
 def animate_grasps(pts, grasp_tfs, confs, pitches=None, res=(1080, 1080)):
     """
