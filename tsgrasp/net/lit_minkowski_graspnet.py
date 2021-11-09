@@ -2,10 +2,11 @@ from omegaconf.dictconfig import DictConfig
 import torch
 import numpy as np
 import pytorch_lightning as pl
-import torchmetrics
 import torch.nn.functional as F
 from tsgrasp.net.minkowski_graspnet import MinkowskiGraspNet
 import MinkowskiEngine as ME
+
+import tracemalloc
 
 class LitMinkowskiGraspNet(pl.LightningModule):
     def __init__(self, model_cfg : DictConfig, training_cfg : DictConfig):
@@ -16,8 +17,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.learning_rate = training_cfg.optimizer.learning_rate
         self.lr_decay = training_cfg.optimizer.lr_decay
 
-        self.train_pt_acc = torchmetrics.Accuracy()
-        self.val_pt_acc = torchmetrics.Accuracy()
+        tracemalloc.start()
+        self.snapshot = tracemalloc.take_snapshot()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -38,6 +39,19 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         return self.model.forward(x)
 
     def _step(self, batch,  batch_idx, stage=None):
+        snapshot = tracemalloc.take_snapshot()
+        top_stats = snapshot.compare_to(self.snapshot, 'lineno')
+
+        print("[ Top 10 ]")
+        for stat in top_stats[:10]:
+            print(stat)
+
+        import os, psutil
+        process = psutil.Process(os.getpid())
+        print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
+
+        self.snapshot = snapshot
+
         if batch_idx % 10 == 0:
             torch.cuda.empty_cache() # recommended for Minkowski
 
@@ -57,7 +71,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             pos_control_points = batch['pos_control_points'], 
             sym_pos_control_points = batch['sym_pos_control_points'],
             gt_grasps_per_batch = batch['gt_grasps_per_batch'], 
-            single_gripper_points = batch['single_gripper_points']
+            single_gripper_points = batch['single_gripper_points'],
+            grasp_offset_label= batch["pos_finger_diffs"]
         )
 
         pt_preds = class_logits > 0
@@ -66,18 +81,51 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             'loss': loss, 
             'pt_preds': pt_preds.detach().cpu(), 
             'pt_labels': pt_labels.detach().cpu(), 
-            'outputs': (class_logits.detach().cpu(), baseline_dir.detach().cpu(), approach_dir.detach().cpu(), grasp_offset.detach().cpu())
+            'outputs': (
+                class_logits.detach().cpu(), 
+                baseline_dir.detach().cpu(), 
+                approach_dir.detach().cpu(), 
+                grasp_offset.detach().cpu())
         }
 
     def training_step_end(self, outputs):
-        self.train_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
-        self.log('train_pt_acc', self.train_pt_acc.compute())
+        self.log('train_pt_acc', accuracy(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('train_pt_true_pos', true_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('train_pt_false_pos', false_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('train_pt_true_neg', true_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('train_pt_false_neg', false_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
         self.log('training_loss', outputs['loss'])
 
     def validation_step_end(self, outputs):
-        self.val_pt_acc(outputs['pt_preds'], outputs['pt_labels'].int())
-        self.log('val_pt_acc', self.val_pt_acc.compute())
+        self.log('val_pt_acc', accuracy(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('val_pt_true_pos', true_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('val_pt_false_pos', false_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('val_pt_true_neg', true_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('val_pt_false_neg', false_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
         self.log('val_loss', outputs['loss'])
+
+    def test_step_end(self, outputs):
+        self.log('test_pt_acc', accuracy(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('test_pt_true_pos', true_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('test_pt_false_pos', false_positive(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('test_pt_true_neg', true_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('test_pt_false_neg', false_negative(
+            outputs['pt_preds'], outputs['pt_labels']))
+        self.log('test_loss', outputs['loss'])
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
@@ -111,7 +159,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         return self._step(batch, batch_idx, "val")
 
     def test_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx,)
+        return self._step(batch, batch_idx, "test")
 
     def training_epoch_end(self, outputs):
         self._epoch_end(outputs, "train")
@@ -120,4 +168,19 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self._epoch_end(outputs, "val")
 
     def test_epoch_end(self, outputs):
-        self._epoch_end(outputs)
+        self._epoch_end(outputs, "test")
+
+def accuracy(pred, des):
+    return torch.mean((pred == des).float())
+
+def true_positive(pred, des):
+    return torch.mean((des.bool()[pred.bool()].float()))
+
+def false_positive(pred, des):
+    return torch.mean(((~des.bool()[pred.bool()]).float()))
+
+def true_negative(pred, des):
+    return torch.mean((~des.bool()[~pred.bool()]).float())
+
+def false_negative(pred, des):
+    return torch.mean((des.bool()[~pred.bool()]).float())
