@@ -84,10 +84,10 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         coords4d = torch.Tensor(pcs)
 
         ## Calculate gripper widths
-        cp = grasp_contact_points
-        finger_diffs = cp[:,0,:] - cp[:,1,:]
-        pos_finger_diffs = finger_diffs[np.where(success)]
-        offsets = np.linalg.norm(pos_finger_diffs, axis=-1) / 2
+        # cp = grasp_contact_points
+        # finger_diffs = cp[:,0,:] - cp[:,1,:]
+        # pos_finger_diffs = finger_diffs[np.where(success)]
+        # offsets = np.linalg.norm(pos_finger_diffs, axis=-1) / 2
 
         ## Generate camera-frame grasp poses corresponding to closest points
         obj_frame_pos_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
@@ -102,7 +102,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         ## Generate camera-frame gripper control points
         control_pts, sym_control_pts, single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, cam_frame_pos_grasp_tfs, self.root)
 
-        pos_contact_pts_mesh = grasp_contact_points[np.where(success)]
+        # pos_contact_pts_mesh = grasp_contact_points[np.where(success)]
         data = {
             "coordinates" : coords4d,
             "positions" : positions,
