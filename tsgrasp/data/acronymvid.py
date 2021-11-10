@@ -34,6 +34,10 @@ class AcronymVidDataset(torch.utils.data.Dataset):
                 keys = {k for k in ds.keys() if k.startswith('pitch')} # a Set
             self._trajectories += [(k, path) for k in keys]
 
+        self._trajectories = np.array(self._trajectories)
+        # cannot be list of tuples, must be contiguous array due to memory leak
+        #https://github.com/pytorch/pytorch/issues/13246
+
     def download(self):
         if len(os.listdir(self.raw_dir)) == 0:
             print(f"No files found in {self.raw_dir}. Please create the dataset using the scripts in GraspRefinement and ACRONYM.")
