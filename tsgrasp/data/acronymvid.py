@@ -111,12 +111,12 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             "pos_control_points" : torch.Tensor(control_pts),
             "sym_pos_control_points" : torch.Tensor(sym_control_pts),
             "single_gripper_points" : torch.Tensor(single_gripper_control_pts),
-            "depth" : torch.Tensor(depth.astype(np.float32)), # np.float32 for endianness
-            "all_pos" : orig_pcs,
+            # "depth" : torch.Tensor(depth.astype(np.float32)), # np.float32 for endianness
+            # "all_pos" : orig_pcs,
             "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
-            "pos_contact_pts_mesh": torch.Tensor(pos_contact_pts_mesh.astype(np.float32)),
-            "pos_finger_diffs": torch.Tensor(offsets).reshape(-1, 1),
-            "camera_pose": torch.Tensor(tfs_from_cam_to_obj.astype(np.float32))
+            # "pos_contact_pts_mesh": torch.Tensor(pos_contact_pts_mesh.astype(np.float32)),
+            # "pos_finger_diffs": torch.Tensor(offsets).reshape(-1, 1),
+            # "camera_pose": torch.Tensor(tfs_from_cam_to_obj.astype(np.float32))
         }
 
         return data
