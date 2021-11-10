@@ -83,11 +83,11 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             'loss': loss, 
             'pt_preds': pt_preds.detach().cpu(), 
             'pt_labels': pt_labels.detach().cpu(), 
-            'outputs': (
-                class_logits.detach().cpu(), 
-                baseline_dir.detach().cpu(), 
-                approach_dir.detach().cpu(), 
-                grasp_offset.detach().cpu())
+            # 'outputs': (
+            #     class_logits.detach().cpu(), 
+            #     baseline_dir.detach().cpu(), 
+            #     approach_dir.detach().cpu(), 
+            #     grasp_offset.detach().cpu())
         }
 
     def training_step_end(self, outputs):
