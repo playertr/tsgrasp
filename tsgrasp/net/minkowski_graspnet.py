@@ -66,7 +66,7 @@ class MinkowskiGraspNet(torch.nn.Module):
 
         return class_logits, baseline_dir, approach_dir, grasp_offset
 
-    def loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points):
+    def loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points):#, grasp_offset_label):
 
         add_s = parallel_add_s_loss if self.use_parallel_add_s else sequential_add_s_loss
         add_s_loss = add_s(
@@ -87,7 +87,12 @@ class MinkowskiGraspNet(torch.nn.Module):
             labels
         )
 
-        loss = self.bce_loss_coeff*classification_loss + self.add_s_loss_coeff*add_s_loss
+        # width_loss = F.mse_loss(grasp_offset, grasp_offset_label)
+
+        loss = 0
+        loss += self.bce_loss_coeff*classification_loss
+        loss += self.add_s_loss_coeff*add_s_loss.squeeze()
+        # loss += self.width_loss_coeff*width_loss
 
         return loss
 
