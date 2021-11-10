@@ -17,7 +17,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.learning_rate = training_cfg.optimizer.learning_rate
         self.lr_decay = training_cfg.optimizer.lr_decay
 
-        tracemalloc.start()
+        tracemalloc.start(25)
         self.snapshot = tracemalloc.take_snapshot()
 
     def configure_optimizers(self):
