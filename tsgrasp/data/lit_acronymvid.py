@@ -23,7 +23,7 @@ class LitAcronymvidDataset(pl.LightningDataModule):
         return DataLoader(self.dataset_train, 
         batch_size=self.batch_size, 
         num_workers=self.num_workers, 
-        collate_fn=minkowski_collate_fn, 
+        collate_fn=minkowski_collate_fn,  shuffle=True,
         # sampler=RandomSampler(self.dataset_train, int(len(self.dataset_train) / self.data_cfg.subset_factor))
         )
 
