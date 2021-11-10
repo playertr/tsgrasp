@@ -93,6 +93,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         obj_frame_pos_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
         tfs_from_obj_to_cam = np.array([inverse_homo(t) for t in tfs_from_cam_to_obj])
 
+        # transform object-frame grasp poses into camera frame
         # gross numpy broadcasting
         # https://stackoverflow.com/questions/32171917/copy-2d-array-into-3rd-dimension-n-times-python
         cam_frame_pos_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_pos_grasp_tfs[np.newaxis,:,:,:])
