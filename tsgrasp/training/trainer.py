@@ -47,13 +47,16 @@ class Trainer:
         else:
             ckpt = None
 
+        kwargs = dict(accelerator='ddp') if cfg.training.gpus > 1 else None
+
         self.trainer = pl.Trainer(
             gpus=cfg.training.gpus,
             logger=_loggers,
             log_every_n_steps=10,
             callbacks=_callbacks,
             max_epochs=cfg.training.max_epochs,
-            resume_from_checkpoint=ckpt
+            resume_from_checkpoint=ckpt,
+            **kwargs
         )
 
     def train(self):
