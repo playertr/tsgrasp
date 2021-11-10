@@ -47,7 +47,7 @@ class Trainer:
         else:
             ckpt = None
 
-        kwargs = dict(accelerator='ddp') if cfg.training.gpus > 1 else None
+        kwargs = dict(accelerator="gpu", strategy="ddp") if cfg.training.gpus > 1 else None
 
         self.trainer = pl.Trainer(
             gpus=cfg.training.gpus,
