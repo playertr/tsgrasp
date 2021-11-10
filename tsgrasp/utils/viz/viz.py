@@ -38,7 +38,8 @@ class GraspAnimationLogger(Callback):
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         pts = batch['positions'].to(pl_module.device)
         outputs = [item.to(pl_module.device) for item in outputs['outputs']]
-        animate_grasps_from_outputs(outputs, pts, name=f"batch_{batch_idx}")
+        animate_grasps_from_outputs(outputs, pts, name=f"new_batch_{batch_idx}")
+
 
 def animate_grasps_from_outputs(outputs, pts, name=""):
     """
@@ -80,7 +81,7 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
         path = f"figs/{name}_{batch_dim}.gif"
         imageio.mimsave(path, ims)
         gif_paths.append(path)
-
+        
     return gif_paths
 
 def animate_grasps(pts, grasp_tfs, confs, pitches=None, res=(1080, 1080)):
