@@ -40,17 +40,19 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
     def _step(self, batch,  batch_idx, stage=None):
         snapshot = tracemalloc.take_snapshot()
-        top_stats = snapshot.compare_to(self.snapshot, 'lineno')
-
-        print("[ Top 10 ]")
-        for stat in top_stats[:10]:
-            print(stat)
+        top_stats = snapshot.compare_to(self.snapshot, 'traceback')
+        # pick the biggest memory block
+        for i in range(5):
+            stat = top_stats[i]
+            print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+            for line in stat.traceback.format():
+                print(line)
 
         import os, psutil
         process = psutil.Process(os.getpid())
         print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
 
-        self.snapshot = snapshot
+        # self.snapshot = snapshot
 
         if batch_idx % 10 == 0:
             torch.cuda.empty_cache() # recommended for Minkowski
