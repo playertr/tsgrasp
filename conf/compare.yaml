@@ -1,0 +1,9 @@
+defaults:
+  - model@tsgrasp_model: minkowski_graspnet
+  - model@ctn_model: temporal_ctn
+  - training: default
+  - data: acronymvid
+  - _self_
+
+ctn_ckpt: /home/tim/Research/contact_torchnet/ckpts/ctn_10-29-2021/model.ckpt
+tsgrasp_ckpt: /home/tim/Research/tsgrasp/outputs/2021-10-26/12-25-08/default_TSGrasp/0_12n2kq3e/checkpoints/epoch=24-step=6349.ckpt

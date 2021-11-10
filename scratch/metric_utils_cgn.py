@@ -151,7 +151,8 @@ def main_ours(cfg: DictConfig):
 
     cfg.data.data_cfg.points_per_frame = 45000
     cfg.training.batch_size=1
-    ckpt = '/home/tim/Research/tsgrasp/ckpts/45000_1/model.ckpt'
+    # ckpt = '/home/tim/Research/tsgrasp/ckpts/45000_1/model.ckpt'
+    ckpt = '/home/tim/Research/tsgrasp/outputs/2021-10-26/12-25-08/default_TSGrasp/0_12n2kq3e/checkpoints/epoch=24-step=6349.ckpt'
 
     pl_dataset = hydra.utils.instantiate(cfg.data, batch_size=1)
     pl_dataset.prepare_data()
@@ -169,6 +170,9 @@ def main_ours(cfg: DictConfig):
         #     continue
         if i > 128 and i < 140:
             continue
+
+        if i > 12:
+            break
 
         out = pl_module._step(data, i)
 

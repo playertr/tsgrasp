@@ -55,6 +55,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             pos_grasp_tfs = np.asarray(ds["grasps/transforms"])[success==1]
             tfs_from_cam_to_obj = np.asarray(ds[traj_name]["tf_from_cam_to_obj"])
             grasp_contact_points = np.asarray(ds["grasps/contact_points"])
+            nearest_grasp_idx = np.asarray(ds[traj_name]['nearest_grasp_idx'])
 
         ## Make data shorter via temporal decimation
         depth = depth[::self.time_decimation_factor, :, :]
@@ -64,13 +65,18 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         pcs = [depth_to_pointcloud(d) for d in depth]
         orig_pcs = torch.Tensor(pcs)
         labels = [label_frame for label_frame in labels]
+        nearest_grasp_idx = [ngi for ngi in nearest_grasp_idx]
 
         ## Downsample points
+        b, npoint, dim = orig_pcs.shape
+        orig_pcs_sampled = torch.empty(b, self.pts_per_frame, dim)
         for i in range(len(pcs)):
             idxs = torch.randperm(len(pcs[i]), dtype=torch.int32, device='cpu')[:self.pts_per_frame].sort()[0].long()
             
+            orig_pcs_sampled[i] = orig_pcs[i][idxs]
             pcs[i] = pcs[i][idxs]
             labels[i] = labels[i].ravel()[idxs]
+            nearest_grasp_idx[i] = nearest_grasp_idx[i].ravel()[idxs]
 
         ## Quantize points to grid
         positions = torch.Tensor(pcs) # save positions prior to truncation
@@ -95,7 +101,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         # (30, 2000, 4, 4)
 
         ## Generate camera-frame gripper control points
-        control_pts, sym_control_pts, single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, cam_frame_pos_grasp_tfs, self.root)
+        control_pts, sym_control_pts, single_gripper_control_pts, sym_single_gripper_control_pts = camera_frame_control_pts(pos_grasp_tfs, cam_frame_pos_grasp_tfs, self.root)
 
         pos_contact_pts_mesh = grasp_contact_points[np.where(success)]
         data = {
@@ -106,8 +112,9 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             "pos_control_points" : torch.Tensor(control_pts),
             "sym_pos_control_points" : torch.Tensor(sym_control_pts),
             "single_gripper_points" : torch.Tensor(single_gripper_control_pts),
+            "sym_single_gripper_points" : torch.Tensor(sym_single_gripper_control_pts),
             "depth" : torch.Tensor(depth.astype(np.float32)), # np.float32 for endianness
-            "all_pos" : orig_pcs,
+            "all_pos" : orig_pcs_sampled,
             "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
             "pos_contact_pts_mesh": torch.Tensor(pos_contact_pts_mesh.astype(np.float32)),
             "pos_finger_diffs": torch.Tensor(offsets).reshape(-1, 1),
@@ -149,8 +156,13 @@ def minkowski_collate_fn(list_data):
         "pos_control_points": pos_control_points,
         "sym_pos_control_points": sym_pos_control_points,
         "single_gripper_points": list_data[0]['single_gripper_points'],
+        "sym_single_gripper_points": list_data[0]['sym_single_gripper_points'],
+        "pos_finger_diffs": [d["pos_finger_diffs"] for d in list_data],
         "gt_grasps_per_batch": gt_grasps_per_batch,
-        "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
+        "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data],
+        "all_pos": torch.stack([d['all_pos'] for d in list_data]),
+        "pos_contact_pts_mesh": [d['pos_contact_pts_mesh'] for d in list_data],
+        "camera_pose": [d['camera_pose'] for d in list_data]
     }
 
 # def padded_stack(t_list) -> torch.Tensor:
@@ -256,7 +268,7 @@ def camera_frame_control_pts(pos_grasp_tfs, cam_frame_grasp_tfs, dataroot):
 
     sym_control_points = np.matmul(sym_gripper_control_points_homog, cam_frame_grasp_tfs.transpose((0, 1, 3, 2)))[:,:,:,:3]
 
-    return control_points, sym_control_points, gripper_control_points[0]
+    return control_points, sym_control_points, gripper_control_points[0], sym_gripper_control_points[0]
 
 def multi_pointcloud_to_4d_coords(pcs):
     """Convert a list of N (L, 3) ndarrays into a single (N*L, 4) ndarray, where the first dimension becomes the time dimension."""
