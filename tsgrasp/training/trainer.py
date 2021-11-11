@@ -48,6 +48,7 @@ class Trainer:
         else:
             ckpt = None
 
+        #https://pytorch-lightning.readthedocs.io/en/latest/guides/speed.html#when-using-ddp-set-find-unused-parameters-false
         kwargs = dict(strategy=DDPPlugin(find_unused_parameters=False)) if cfg.training.gpus > 1 else {}
 
         self.trainer = pl.Trainer(
