@@ -21,7 +21,6 @@ class Trainer:
         _loggers  = [tb_logger]
 
         if cfg.training.use_wandb:
-            wandb.init()
             wandb_logger = loggers.WandbLogger(
                 project=cfg.training.wandb.project, 
                 log_model="all", 
@@ -33,7 +32,7 @@ class Trainer:
         self.pl_dataset.setup()
         example_batch = next(iter(self.pl_dataset.train_dataloader()))
         _callbacks = [
-            ModelCheckpoint(), 
+            ModelCheckpoint(every_n_epochs=1), 
             LearningRateMonitor(logging_interval='step'),
         ]
 
@@ -48,6 +47,9 @@ class Trainer:
             ckpt = None
 
         kwargs = dict(accelerator="ddp") if cfg.training.gpus > 1 else {}
+
+        # if True:
+        #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
 
         self.trainer = pl.Trainer(
             gpus=cfg.training.gpus,
