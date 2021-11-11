@@ -23,18 +23,18 @@ class LitAcronymvidDataset(pl.LightningDataModule):
         return DataLoader(self.dataset_train, 
         batch_size=self.batch_size, 
         num_workers=self.num_workers, 
-        collate_fn=minkowski_collate_fn,  shuffle=True, pin_memory=True
+        collate_fn=minkowski_collate_fn,  shuffle=True,
         # sampler=RandomSampler(self.dataset_train, int(len(self.dataset_train) / self.data_cfg.subset_factor))
         )
 
     def val_dataloader(self):
-        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn, pin_memory=True
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn,  
         # sampler=RandomSampler(self.dataset_val, int(len(self.dataset_val) / self.data_cfg.subset_factor))
         )
 
     def test_dataloader(self):
         # TODO: DON'T USE VAL DATASET FOR TESTING!
-        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn, pin_memory=True 
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn, 
         # sampler=RandomSampler(self.dataset_val, int(len(self.dataset_val) / self.data_cfg.subset_factor))
         )
 
