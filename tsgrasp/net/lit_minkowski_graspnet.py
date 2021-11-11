@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from tsgrasp.net.minkowski_graspnet import MinkowskiGraspNet
 import MinkowskiEngine as ME
 
-import tracemalloc
+# import tracemalloc
 
 class LitMinkowskiGraspNet(pl.LightningModule):
     def __init__(self, model_cfg : DictConfig, training_cfg : DictConfig):
@@ -17,8 +17,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.learning_rate = training_cfg.optimizer.learning_rate
         self.lr_decay = training_cfg.optimizer.lr_decay
 
-        tracemalloc.start()
-        self.snapshot = tracemalloc.take_snapshot()
+        # tracemalloc.start()
+        # self.snapshot = tracemalloc.take_snapshot()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -48,9 +48,9 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         #     for line in stat.traceback.format():
         #         print(line)
 
-        import os, psutil
-        process = psutil.Process(os.getpid())
-        print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
+        # import os, psutil
+        # process = psutil.Process(os.getpid())
+        # print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
 
         # self.snapshot = snapshot
 
@@ -101,7 +101,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             outputs['pt_preds'], outputs['pt_labels']))
         self.log('train_pt_false_neg', false_negative(
             outputs['pt_preds'], outputs['pt_labels']))
-        self.log('training_loss', outputs['loss'])
+        self.log('training_loss', float(outputs['loss']))
 
     def validation_step_end(self, outputs):
         self.log('val_pt_acc', accuracy(
@@ -114,7 +114,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             outputs['pt_preds'], outputs['pt_labels']))
         self.log('val_pt_false_neg', false_negative(
             outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_loss', outputs['loss'])
+        self.log('val_loss', float(outputs['loss']))
 
     def test_step_end(self, outputs):
         self.log('test_pt_acc', accuracy(
@@ -127,7 +127,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             outputs['pt_preds'], outputs['pt_labels']))
         self.log('test_pt_false_neg', false_negative(
             outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_loss', outputs['loss'])
+        self.log('test_loss', float(outputs['loss']))
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
