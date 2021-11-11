@@ -20,7 +20,6 @@ class Trainer:
         tb_logger = loggers.TensorBoardLogger(tb_dir)
         _loggers  = [tb_logger]
 
-        import os
         print(os.environ)
         
         if cfg.training.use_wandb:
