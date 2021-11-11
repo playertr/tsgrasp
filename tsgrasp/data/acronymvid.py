@@ -154,8 +154,8 @@ def minkowski_collate_fn(list_data):
         "pos_control_points": pos_control_points,
         "sym_pos_control_points": sym_pos_control_points,
         "single_gripper_points": list_data[0]['single_gripper_points'],
-        "gt_grasps_per_batch": gt_grasps_per_batch,
-        "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
+        "gt_grasps_per_batch": torch.Tensor(gt_grasps_per_batch),
+        # "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
     }
 
 # def padded_stack(t_list) -> torch.Tensor:
