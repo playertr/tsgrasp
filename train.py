@@ -1,13 +1,13 @@
 import hydra
 from omegaconf import DictConfig
 from tsgrasp.training.trainer import Trainer
-import wandb
+# import wandb
 
 @hydra.main(config_path="conf", config_name="config")
 def train(cfg : DictConfig):
 
-    if cfg.training.use_wandb:
-        wandb.init()
+    # if cfg.training.use_wandb:
+    #     wandb.init()
         
     trainer = Trainer(cfg)
     trainer.train()
