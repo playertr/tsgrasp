@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 import os
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
+from pytorch_lightning.plugins import DDPPlugin
 
 from hydra.utils import instantiate
 
@@ -47,7 +48,7 @@ class Trainer:
         else:
             ckpt = None
 
-        kwargs = dict(strategy="ddp") if cfg.training.gpus > 1 else {}
+        kwargs = dict(strategy=DDPPlugin(find_unused_parameters=False)) if cfg.training.gpus > 1 else {}
 
         # if True:
         #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
