@@ -20,7 +20,17 @@ class Trainer:
         tb_logger = loggers.TensorBoardLogger(tb_dir)
         _loggers  = [tb_logger]
 
-        self.add_wandb_logger(cfg, _loggers)
+        import os
+        print(os.environ)
+        
+        if cfg.training.use_wandb:
+            wandb_logger = loggers.WandbLogger(
+                project=cfg.training.wandb.project, 
+                log_model="all", 
+                name=cfg.training.wandb.experiment
+            )
+            wandb_logger.watch(self.pl_model)
+            _loggers.append(wandb_logger)
         
         self.pl_dataset.setup()
         example_batch = next(iter(self.pl_dataset.train_dataloader()))
@@ -54,18 +64,6 @@ class Trainer:
             **kwargs
         )
 
-    @rank_zero_only
-    def add_wandb_logger(self, cfg, _loggers):
-        if cfg.training.use_wandb:
-            import wandb
-            wandb.init(group="DDP")
-            wandb_logger = loggers.WandbLogger(
-                project=cfg.training.wandb.project, 
-                log_model="all", 
-                name=cfg.training.wandb.experiment
-            )
-            wandb_logger.watch(self.pl_model)
-            _loggers.append(wandb_logger)
 
     def train(self):
         self.trainer.fit(self.pl_model, datamodule=self.pl_dataset)
