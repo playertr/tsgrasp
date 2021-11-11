@@ -57,6 +57,8 @@ class Trainer:
     @rank_zero_only
     def add_wandb_logger(self, cfg, _loggers):
         if cfg.training.use_wandb:
+            import wandb
+            wandb.init()
             wandb_logger = loggers.WandbLogger(
                 project=cfg.training.wandb.project, 
                 log_model="all", 
