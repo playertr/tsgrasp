@@ -3,7 +3,6 @@ import pytorch_lightning as pl
 import os
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
-from pytorch_lightning.utilities import rank_zero_only
 
 from hydra.utils import instantiate
 
@@ -19,17 +18,17 @@ class Trainer:
         os.makedirs(tb_dir, exist_ok=True)
         tb_logger = loggers.TensorBoardLogger(tb_dir)
         _loggers  = [tb_logger]
-
-        print(os.environ)
         
         if cfg.training.use_wandb:
-            wandb_logger = loggers.WandbLogger(
-                project=cfg.training.wandb.project, 
-                log_model="all", 
-                name=cfg.training.wandb.experiment
-            )
-            wandb_logger.watch(self.pl_model)
-            _loggers.append(wandb_logger)
+            rank = os.getenv('LOCAL_RANK')
+            if rank is None or rank == 0:
+                wandb_logger = loggers.WandbLogger(
+                    project=cfg.training.wandb.project, 
+                    log_model="all", 
+                    name=cfg.training.wandb.experiment
+                )
+                wandb_logger.watch(self.pl_model)
+                _loggers.append(wandb_logger)
         
         self.pl_dataset.setup()
         example_batch = next(iter(self.pl_dataset.train_dataloader()))
