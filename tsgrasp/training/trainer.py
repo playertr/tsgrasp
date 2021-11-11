@@ -4,7 +4,6 @@ import os
 import wandb
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
-from pytorch_lightning.plugins import DDPPlugin
 
 from hydra.utils import instantiate
 
@@ -22,7 +21,7 @@ class Trainer:
         _loggers  = [tb_logger]
 
         if cfg.training.use_wandb:
-            wandb.login()
+            wandb.init()
             wandb_logger = loggers.WandbLogger(
                 project=cfg.training.wandb.project, 
                 log_model="all", 
@@ -48,8 +47,7 @@ class Trainer:
         else:
             ckpt = None
 
-        #https://pytorch-lightning.readthedocs.io/en/latest/guides/speed.html#when-using-ddp-set-find-unused-parameters-false
-        kwargs = dict(strategy=DDPPlugin(find_unused_parameters=False)) if cfg.training.gpus > 1 else {}
+        kwargs = dict(accelerator="ddp") if cfg.training.gpus > 1 else {}
 
         self.trainer = pl.Trainer(
             gpus=cfg.training.gpus,
