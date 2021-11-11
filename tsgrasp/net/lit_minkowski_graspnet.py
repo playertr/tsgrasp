@@ -17,8 +17,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self.learning_rate = training_cfg.optimizer.learning_rate
         self.lr_decay = training_cfg.optimizer.lr_decay
 
-        # tracemalloc.start()
-        # self.snapshot = tracemalloc.take_snapshot()
+        tracemalloc.start()
+        self.snapshot = tracemalloc.take_snapshot()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -41,16 +41,16 @@ class LitMinkowskiGraspNet(pl.LightningModule):
     def _step(self, batch,  batch_idx, stage=None):
         # snapshot = tracemalloc.take_snapshot()
         # top_stats = snapshot.compare_to(self.snapshot, 'traceback')
-        # # pick the biggest memory block
+        # pick the biggest memory block
         # for i in range(5):
         #     stat = top_stats[i]
         #     print("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
         #     for line in stat.traceback.format():
         #         print(line)
 
-        # import os, psutil
-        # process = psutil.Process(os.getpid())
-        # print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
+        import os, psutil
+        process = psutil.Process(os.getpid())
+        print(f"Total memory used: {process.memory_info().rss / 1e6} MB")  # in bytes 
 
         # self.snapshot = snapshot
 
@@ -173,16 +173,16 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         self._epoch_end(outputs, "test")
 
 def accuracy(pred, des):
-    return torch.mean((pred == des).float())
+    return float(torch.mean((pred == des).float()))
 
 def true_positive(pred, des):
-    return torch.mean((des.bool()[pred.bool()].float()))
+    return float(torch.mean((des.bool()[pred.bool()].float())))
 
 def false_positive(pred, des):
-    return torch.mean(((~des.bool()[pred.bool()]).float()))
+    return float(torch.mean(((~des.bool()[pred.bool()]).float())))
 
 def true_negative(pred, des):
-    return torch.mean((~des.bool()[~pred.bool()]).float())
+    return float(torch.mean((~des.bool()[~pred.bool()]).float()))
 
 def false_negative(pred, des):
-    return torch.mean((des.bool()[~pred.bool()]).float())
+    return float(torch.mean((des.bool()[~pred.bool()]).float()))
