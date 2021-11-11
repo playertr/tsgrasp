@@ -1,9 +1,9 @@
 from omegaconf import DictConfig
 import pytorch_lightning as pl
 import os
-import wandb
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
+from pytorch_lightning.utilities import rank_zero_only
 
 from hydra.utils import instantiate
 
@@ -20,15 +20,8 @@ class Trainer:
         tb_logger = loggers.TensorBoardLogger(tb_dir)
         _loggers  = [tb_logger]
 
-        if cfg.training.use_wandb:
-            wandb_logger = loggers.WandbLogger(
-                project=cfg.training.wandb.project, 
-                log_model="all", 
-                name=cfg.training.wandb.experiment
-            )
-            wandb_logger.watch(self.pl_model)
-            _loggers.append(wandb_logger)
-
+        self.add_wandb_logger(cfg, _loggers)
+        
         self.pl_dataset.setup()
         example_batch = next(iter(self.pl_dataset.train_dataloader()))
         _callbacks = [
@@ -46,7 +39,7 @@ class Trainer:
         else:
             ckpt = None
 
-        kwargs = dict(accelerator="ddp") if cfg.training.gpus > 1 else {}
+        kwargs = dict(strategy="ddp") if cfg.training.gpus > 1 else {}
 
         # if True:
         #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
@@ -60,6 +53,17 @@ class Trainer:
             resume_from_checkpoint=ckpt,
             **kwargs
         )
+
+    @rank_zero_only
+    def add_wandb_logger(self, cfg, _loggers):
+        if cfg.training.use_wandb:
+            wandb_logger = loggers.WandbLogger(
+                project=cfg.training.wandb.project, 
+                log_model="all", 
+                name=cfg.training.wandb.experiment
+            )
+            wandb_logger.watch(self.pl_model)
+            _loggers.append(wandb_logger)
 
     def train(self):
         self.trainer.fit(self.pl_model, datamodule=self.pl_dataset)
