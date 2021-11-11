@@ -56,6 +56,7 @@ class Trainer:
 
     @rank_zero_only
     def add_wandb_logger(self, cfg, _loggers):
+        breakpoint()
         if cfg.training.use_wandb:
             import wandb
             wandb.init()
