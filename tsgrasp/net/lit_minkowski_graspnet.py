@@ -90,44 +90,44 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             #     grasp_offset.detach().cpu())
         }
 
-    def training_step_end(self, outputs):
-        self.log('train_pt_acc', accuracy(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('train_pt_true_pos', true_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('train_pt_false_pos', false_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('train_pt_true_neg', true_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('train_pt_false_neg', false_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('training_loss', float(outputs['loss']))
+    # def training_step_end(self, outputs):
+    #     self.log('train_pt_acc', accuracy(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('train_pt_true_pos', true_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('train_pt_false_pos', false_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('train_pt_true_neg', true_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('train_pt_false_neg', false_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('training_loss', float(outputs['loss']))
 
-    def validation_step_end(self, outputs):
-        self.log('val_pt_acc', accuracy(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_pt_true_pos', true_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_pt_false_pos', false_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_pt_true_neg', true_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_pt_false_neg', false_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('val_loss', float(outputs['loss']))
+    # def validation_step_end(self, outputs):
+    #     self.log('val_pt_acc', accuracy(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('val_pt_true_pos', true_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('val_pt_false_pos', false_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('val_pt_true_neg', true_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('val_pt_false_neg', false_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('val_loss', float(outputs['loss']))
 
-    def test_step_end(self, outputs):
-        self.log('test_pt_acc', accuracy(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_pt_true_pos', true_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_pt_false_pos', false_positive(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_pt_true_neg', true_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_pt_false_neg', false_negative(
-            outputs['pt_preds'], outputs['pt_labels']))
-        self.log('test_loss', float(outputs['loss']))
+    # def test_step_end(self, outputs):
+    #     self.log('test_pt_acc', accuracy(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('test_pt_true_pos', true_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('test_pt_false_pos', false_positive(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('test_pt_true_neg', true_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('test_pt_false_neg', false_negative(
+    #         outputs['pt_preds'], outputs['pt_labels']))
+    #     self.log('test_loss', float(outputs['loss']))
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
