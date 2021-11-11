@@ -48,7 +48,7 @@ class Trainer:
         else:
             ckpt = None
 
-        kwargs = dict(strategy=DDPPlugin(find_unused_parameters=False)) if cfg.training.gpus > 1 else {}
+        kwargs = dict(strategy=DDPPlugin(find_unused_parameters=True)) if cfg.training.gpus > 1 else {}
 
         # if True:
         #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
