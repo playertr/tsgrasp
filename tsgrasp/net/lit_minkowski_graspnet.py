@@ -74,7 +74,7 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             sym_pos_control_points = batch['sym_pos_control_points'],
             gt_grasps_per_batch = batch['gt_grasps_per_batch'], 
             single_gripper_points = batch['single_gripper_points'],
-            # grasp_offset_label= batch["pos_finger_diffs"]
+            grasp_offset_label= batch["pos_finger_diffs"]
         )
 
         pt_preds = class_logits > 0

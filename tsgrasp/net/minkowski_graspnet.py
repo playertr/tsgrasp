@@ -15,6 +15,8 @@ class MinkowskiGraspNet(torch.nn.Module):
         self.use_parallel_add_s = cfg.use_parallel_add_s
         self.add_s_loss_coeff = cfg.add_s_loss_coeff
         self.bce_loss_coeff = cfg.bce_loss_coeff
+        self.width_loss_coeff = cfg.width_loss_coeff
+        self.top_conf_quantile = cfg.top_confidence_quantile
 
         self.backbone = initialize_minkowski_unet(
             cfg.backbone_model_name, cfg.feature_dimension, cfg.backbone_out_dim, D=cfg.D
@@ -66,7 +68,7 @@ class MinkowskiGraspNet(torch.nn.Module):
 
         return class_logits, baseline_dir, approach_dir, grasp_offset
 
-    def loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points):#, grasp_offset_label):
+    def loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points, grasp_offset_label):
 
         add_s = parallel_add_s_loss if self.use_parallel_add_s else sequential_add_s_loss
         add_s_loss = add_s(
@@ -82,17 +84,27 @@ class MinkowskiGraspNet(torch.nn.Module):
             grasp_width = grasp_offset
         )
 
-        classification_loss = F.binary_cross_entropy_with_logits(
+        bce_loss = F.binary_cross_entropy_with_logits(
             class_logits,
-            labels
+            labels, reduction='none'
+        ).ravel()
+        bce_loss = torch.mean(
+            torch.topk(bce_loss, k=int(len(bce_loss) * self.top_conf_quantile))[0]
         )
 
-        # width_loss = F.mse_loss(grasp_offset, grasp_offset_label)
+        # MSE loss for width
+        # Including only non-nan grasp offset labels
+        # Including only actual grasps
+        offset_label_nan = grasp_offset_label.ravel().isnan()
+        grasp_offset_label = torch.nan_to_num(grasp_offset_label)
+        width_mse = (grasp_offset.ravel() - grasp_offset_label.ravel())**2
+        width_mse = width_mse[labels.bool().ravel() & ~offset_label_nan]
+        width_loss = torch.mean(width_mse) if len(width_mse > 0) else 0.0
 
         loss = 0
-        loss += self.bce_loss_coeff*classification_loss
+        loss += self.bce_loss_coeff*bce_loss
         loss += self.add_s_loss_coeff*add_s_loss.squeeze()
-        # loss += self.width_loss_coeff*width_loss
+        loss += self.width_loss_coeff*width_loss
 
         return loss
 

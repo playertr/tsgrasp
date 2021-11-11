@@ -54,7 +54,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             # whether a given pixel's 3D point is within data_generation.params.EPSILON of a positive grasp contact.
             depth = np.asarray(ds[traj_name]["depth"])
             labels = np.asarray(ds[traj_name]["grasp_labels"])
-            # nearest_grasp_idxs = np.asarray(ds[traj_name]["nearest_grasp_idx"])
+            nearest_grasp_idx = np.asarray(ds[traj_name]["nearest_grasp_idx"])
             success = np.asarray(ds["grasps/qualities/flex/object_in_gripper"])
             pos_grasp_tfs = np.asarray(ds["grasps/transforms"])[success==1]
             tfs_from_cam_to_obj = np.asarray(ds[traj_name]["tf_from_cam_to_obj"])
@@ -64,10 +64,12 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         depth = depth[::self.time_decimation_factor, :, :]
         labels = labels[::self.time_decimation_factor, :, :]
         tfs_from_cam_to_obj = tfs_from_cam_to_obj[::self.time_decimation_factor,:,:]
+        nearest_grasp_idx = nearest_grasp_idx[::self.time_decimation_factor,:,:]
 
         pcs = [depth_to_pointcloud(d) for d in depth]
         orig_pcs = torch.Tensor(pcs)
         labels = [label_frame for label_frame in labels]
+        nearest_grasp_idx = [idcs for idcs in nearest_grasp_idx]
 
         ## Downsample points
         for i in range(len(pcs)):
@@ -75,6 +77,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             
             pcs[i] = pcs[i][idxs]
             labels[i] = labels[i].ravel()[idxs]
+            nearest_grasp_idx[i] = nearest_grasp_idx[i].ravel()[idxs]
 
         ## Quantize points to grid
         positions = torch.Tensor(pcs) # save positions prior to truncation
@@ -84,10 +87,10 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         coords4d = torch.Tensor(pcs)
 
         ## Calculate gripper widths
-        # cp = grasp_contact_points
-        # finger_diffs = cp[:,0,:] - cp[:,1,:]
-        # pos_finger_diffs = finger_diffs[np.where(success)]
-        # offsets = np.linalg.norm(pos_finger_diffs, axis=-1) / 2
+        cp = grasp_contact_points
+        finger_diffs = cp[:,0,:] - cp[:,1,:]
+        offsets = np.linalg.norm(finger_diffs, axis=-1)
+        offsets = offsets[torch.Tensor(nearest_grasp_idx).ravel().long()]
 
         ## Generate camera-frame grasp poses corresponding to closest points
         obj_frame_pos_grasp_tfs = pos_grasp_tfs # (2000, 4, 4)
@@ -115,7 +118,7 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             # "all_pos" : orig_pcs,
             "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
             # "pos_contact_pts_mesh": torch.Tensor(pos_contact_pts_mesh.astype(np.float32)),
-            # "pos_finger_diffs": torch.Tensor(offsets).reshape(-1, 1),
+            "pos_finger_diffs": torch.Tensor(offsets).reshape(-1, 1),
             # "camera_pose": torch.Tensor(tfs_from_cam_to_obj.astype(np.float32))
         }
 
@@ -155,6 +158,7 @@ def minkowski_collate_fn(list_data):
         "sym_pos_control_points": sym_pos_control_points,
         "single_gripper_points": list_data[0]['single_gripper_points'],
         "gt_grasps_per_batch": torch.Tensor(gt_grasps_per_batch),
+        "pos_finger_diffs": torch.stack([d["pos_finger_diffs"] for d in list_data])
         # "cam_frame_pos_grasp_tfs": [d["cam_frame_pos_grasp_tfs"] for d in list_data]
     }
 
