@@ -1,0 +1,5 @@
+# @package _global_
+
+model:
+  model_cfg:
+    backbone_model_name: "STRes16UNet34"
