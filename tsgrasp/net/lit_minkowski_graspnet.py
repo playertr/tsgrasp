@@ -76,11 +76,11 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             single_gripper_points = batch['single_gripper_points']
         )
 
-        # weighted_width_loss = self.model.weighted_width_loss(
-        #     grasp_offset,
-        #     grasp_offset_label= batch["pos_finger_diffs"],
-        #     labels=pt_labels
-        # )
+        weighted_width_loss = self.model.weighted_width_loss(
+            grasp_offset,
+            grasp_offset_label= batch["pos_finger_diffs"],
+            labels=pt_labels
+        )
 
         weighted_bce_loss = self.model.weighted_bce_loss(
             class_logits, pt_labels
@@ -88,9 +88,9 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
         self.log(f"{stage}_add_s_loss", weighted_add_s_loss, on_step=True, on_epoch=True, sync_dist=True)
         self.log(f"{stage}_bce_loss", weighted_bce_loss, on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_width_loss", weighted_width_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_width_loss", weighted_width_loss, on_step=True, on_epoch=True, sync_dist=True)
 
-        loss = weighted_add_s_loss + weighted_bce_loss #+ weighted_width_loss
+        loss = weighted_add_s_loss + weighted_bce_loss + weighted_width_loss
 
         pt_preds = class_logits > 0
 
