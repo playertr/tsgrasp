@@ -4,9 +4,11 @@ data:
     data_cfg:
         dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
         grid_size: 0.005
-        points_per_frame: 90000
+        points_per_frame: 45000
 
 training:
+    batch_size: 5
+
     use_wandb: False
     wandb:
     project: "TSGrasp"
