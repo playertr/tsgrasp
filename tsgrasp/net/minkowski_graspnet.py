@@ -68,8 +68,18 @@ class MinkowskiGraspNet(torch.nn.Module):
 
         return class_logits, baseline_dir, approach_dir, grasp_offset
 
-    def loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points, grasp_offset_label):
+    def weighted_bce_loss(self, class_logits, labels):
+        bce_loss = F.binary_cross_entropy_with_logits(
+            class_logits,
+            labels, reduction='none'
+        ).ravel()
+        bce_loss = torch.mean(
+            torch.topk(bce_loss, k=int(len(bce_loss) * self.top_conf_quantile))[0]
+        )
+    
+        return self.bce_loss_coeff*bce_loss
 
+    def weighted_add_s_loss(self, class_logits, labels, baseline_dir, approach_dir, grasp_offset, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points):
         add_s = parallel_add_s_loss if self.use_parallel_add_s else sequential_add_s_loss
         add_s_loss = add_s(
             approach_dir = approach_dir, 
@@ -84,14 +94,9 @@ class MinkowskiGraspNet(torch.nn.Module):
             grasp_width = grasp_offset
         )
 
-        bce_loss = F.binary_cross_entropy_with_logits(
-            class_logits,
-            labels, reduction='none'
-        ).ravel()
-        bce_loss = torch.mean(
-            torch.topk(bce_loss, k=int(len(bce_loss) * self.top_conf_quantile))[0]
-        )
+        return self.add_s_loss_coeff*add_s_loss.squeeze()
 
+    def weighted_width_loss(self, grasp_offset, grasp_offset_label, labels):
         # MSE loss for width
         # Including only non-nan grasp offset labels
         # Including only actual grasps
@@ -101,12 +106,7 @@ class MinkowskiGraspNet(torch.nn.Module):
         width_mse = width_mse[labels.bool().ravel() & ~offset_label_nan]
         width_loss = torch.mean(width_mse) if len(width_mse > 0) else 0.0
 
-        loss = 0
-        loss += self.bce_loss_coeff*bce_loss
-        loss += self.add_s_loss_coeff*add_s_loss.squeeze()
-        loss += self.width_loss_coeff*width_loss
-
-        return loss
+        return self.width_loss_coeff*width_loss
 
 def parallel_add_s_loss(approach_dir, baseline_dir, positions, pos_control_points, sym_pos_control_points, gt_grasps_per_batch, single_gripper_points, labels, logits, grasp_width) -> torch.Tensor:
     """Compute symmetric ADD-S loss from Contact-GraspNet, finding minimum

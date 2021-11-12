@@ -13,7 +13,6 @@ class LitMinkowskiGraspNet(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.model = MinkowskiGraspNet(model_cfg)
-        self.loss = self.model.loss
         self.learning_rate = training_cfg.optimizer.learning_rate
         self.lr_decay = training_cfg.optimizer.lr_decay
 
@@ -66,16 +65,32 @@ class LitMinkowskiGraspNet(pl.LightningModule):
 
         pt_labels = batch['labels']
 
-        loss = self.model.loss(
+        # Each 'weighted' loss has been multiplied by its loss coefficient
+        weighted_add_s_loss = self.model.weighted_add_s_loss(
             class_logits, pt_labels,
             baseline_dir, approach_dir, grasp_offset,
             positions = batch['positions'],
             pos_control_points = batch['pos_control_points'], 
             sym_pos_control_points = batch['sym_pos_control_points'],
             gt_grasps_per_batch = batch['gt_grasps_per_batch'], 
-            single_gripper_points = batch['single_gripper_points'],
-            grasp_offset_label= batch["pos_finger_diffs"]
+            single_gripper_points = batch['single_gripper_points']
         )
+
+        weighted_width_loss = self.model.weighted_width_loss(
+            grasp_offset,
+            grasp_offset_label= batch["pos_finger_diffs"],
+            labels=pt_labels
+        )
+
+        weighted_bce_loss = self.model.weighted_bce_loss(
+            class_logits, pt_labels
+        )
+
+        self.log(f"{stage}_add_s_loss", weighted_add_s_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_bce_loss", weighted_bce_loss, on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_width_loss", weighted_width_loss, on_step=True, on_epoch=True, sync_dist=True)
+
+        loss = weighted_add_s_loss + weighted_bce_loss + weighted_width_loss
 
         pt_preds = class_logits > 0
 
