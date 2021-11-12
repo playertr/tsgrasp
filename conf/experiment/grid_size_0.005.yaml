@@ -11,5 +11,5 @@ training:
 
     use_wandb: False
     wandb:
-    project: "TSGrasp"
-    experiment: "grid_size_0.005"
+        project: "TSGrasp"
+        experiment: "grid_size_0.005"
