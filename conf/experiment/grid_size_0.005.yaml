@@ -1,0 +1,13 @@
+# @package _global_
+
+data:
+    data_cfg:
+        dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
+        grid_size: 0.005
+        points_per_frame: 90000
+
+training:
+    use_wandb: False
+    wandb:
+    project: "TSGrasp"
+    experiment: "grid_size_0.005"
