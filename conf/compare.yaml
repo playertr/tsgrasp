@@ -5,5 +5,14 @@ defaults:
   - data: acronymvid
   - _self_
 
-ctn_ckpt: /home/tim/Research/contact_torchnet/ckpts/ctn_10-29-2021/model.ckpt
-tsgrasp_ckpt: /home/tim/Research/tsgrasp/outputs/2021-10-26/12-25-08/default_TSGrasp/0_12n2kq3e/checkpoints/epoch=24-step=6349.ckpt
+ctn_ckpt: /home/tim/Research/tsgrasp/ctn_model.ckpt
+# tsgrasp_ckpt: /home/tim/Research/tsgrasp/tsgrasp_model.ckpt
+tsgrasp_ckpt: /home/tim/Research/tsgrasp/ckpts/45000_1/model.ckpt
+
+training:
+  gpus: 0
+  batch_size: 1
+
+data:
+  data_cfg:
+    points_per_frame: 45000

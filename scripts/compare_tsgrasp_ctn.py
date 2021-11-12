@@ -14,9 +14,22 @@ from tsgrasp.utils.metric_utils.metrics import success_coverage_curve
 
 def compare(tsgrasp: LitMinkowskiGraspNet, ctn: LitTemporalContactTorchNet, test_dataloader):
     for batch_idx, batch in enumerate(tqdm(test_dataloader)):
+
         
+        ## Get the results from tsgrasp on this batch
         tsgrasp_results = tsgrasp.test_step(batch, batch_idx)
-        ctn_results = ctn.test_step(batch, batch_idx)
+
+        ## Prepare a 20,000-point sampled batch for CTN
+        def subsample_idxs(N, num_tot):
+            """Indices to randomly draw N samples without replacement. """
+            return torch.randperm(num_tot, dtype=torch.int32, device='cpu')[:N].sort()[0].long()
+        from copy import deepcopy
+        ctn_batch = deepcopy(batch)
+        idxs = subsample_idxs(20_000, batch['all_pos'].shape[2])
+        ctn_batch['all_pos'] = batch['all_pos'][:, :, idxs, :]
+
+        ## Get the results from CTN on the sampled batch
+        ctn_results = ctn.test_step(ctn_batch, batch_idx)
 
         ctn_confs = [torch.sigmoid(r[0]) for r in ctn_results['outputs']]
         ctn_pred_pts = [r[4] for r in ctn_results['outputs']]
@@ -84,33 +97,35 @@ def compare(tsgrasp: LitMinkowskiGraspNet, ctn: LitTemporalContactTorchNet, test
             print(f"TP: {tp_tsgrasp:.2f} \tFP: {fp_tsgrasp:.2f} \tTN: {tn_tsgrasp:.2f} \FN: {fn_tsgrasp:.2f}")
 
 
-            import pickle
-            with open(f"/home/tim/Research/tsgrasp/compare/out{batch_idx}_{t}.pickle", 'wb') as f:
-                pickle.dump({
-                    "ctn": dict(
-                        confs=ctn_confs[t],
-                        pred_grasp_locs=ctn_pred_grasp_locs,
-                        gt_labels=ctn_gt_labels,
-                        pos_gt_grasp_locs=ctn_pred_grasp_locs[ctn_gt_labels]
-                    ),
-                    "tsgrasp": dict(
-                        confs = tsgrasp_confs[t],
-                        pred_grasp_locs=tsgrasp_pred_pts[t],
-                        gt_labels=tsgrasp_labels[t],
-                        pos_gt_grasp_locs=tsgrasp_pred_pts[t][tsgrasp_labels[t].bool()]
-                    ),
-                    "tsgrasp_ctn_pts": dict(
-                        confs = tsgrasp_confs[t][idcs],
-                        pred_grasp_locs=pred_grasp_locs,
-                        gt_labels=gt_labels,
-                        pos_gt_grasp_locs=pred_grasp_locs[gt_labels.bool()]
-                    ),
-                }, f)
+            # import pickle
+            # with open(f"/home/tim/Research/tsgrasp/compare/out{batch_idx}_{t}.pickle", 'wb') as f:
+            #     pickle.dump({
+            #         "ctn": dict(
+            #             confs=ctn_confs[t],
+            #             pred_grasp_locs=ctn_pred_grasp_locs,
+            #             gt_labels=ctn_gt_labels,
+            #             pos_gt_grasp_locs=ctn_pred_grasp_locs[ctn_gt_labels]
+            #         ),
+            #         "tsgrasp": dict(
+            #             confs = tsgrasp_confs[t],
+            #             pred_grasp_locs=tsgrasp_pred_pts[t],
+            #             gt_labels=tsgrasp_labels[t],
+            #             pos_gt_grasp_locs=tsgrasp_pred_pts[t][tsgrasp_labels[t].bool()]
+            #         ),
+            #         "tsgrasp_ctn_pts": dict(
+            #             confs = tsgrasp_confs[t][idcs],
+            #             pred_grasp_locs=pred_grasp_locs,
+            #             gt_labels=gt_labels,
+            #             pos_gt_grasp_locs=pred_grasp_locs[gt_labels.bool()]
+            #         ),
+            #     }, f)
 
         import pandas as pd
         super_sc_ctn = pd.concat(sc_ctns).groupby('confidence').mean()
         super_sc_tsgrasp = pd.concat(sc_tsgrasps).groupby('confidence').mean()
         super_sc_tsgrasp_ctn = pd.concat(sc_tsgrasp_ctns).groupby('confidence').mean()
+
+        pd.to_csv(f"/home/tim/Research/tsgrasp/compare/sc_{batch_idx}.csv")
 
         from tsgrasp.utils.metric_utils.metrics import plot_s_c_curve
         import matplotlib.pyplot as plt
@@ -121,8 +136,7 @@ def compare(tsgrasp: LitMinkowskiGraspNet, ctn: LitTemporalContactTorchNet, test
         plot_s_c_curve(super_sc_tsgrasp_ctn, ax=ax, label='TSGrasp-CTNpts')
         fig.legend()
 
-        plt.pause(0.01)
-        print("bp")
+        plt.savefig(f"/home/tim/Research/tsgrasp/compare/sc_{batch_idx}.png")
 
 # torch.mean(
 #     ((tsgrasp_confs[0] > 0.5) == tsgrasp_labels[0]).float()
