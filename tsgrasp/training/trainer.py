@@ -23,6 +23,10 @@ class Trainer:
         if cfg.training.use_wandb:
             rank = os.getenv('LOCAL_RANK')
             if rank is None or rank == 0:
+                import wandb
+                wandb.init(project=cfg.training.wandb.project,
+                config=cfg,
+                name=cfg.training.wandb.experiment)
                 wandb_logger = loggers.WandbLogger(
                     project=cfg.training.wandb.project, 
                     log_model="all", 
