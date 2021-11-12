@@ -7,3 +7,6 @@ scratch/
 figs/
 tensorboard/
 ckpts/
+*.pickle
+*.png
+*.csv
