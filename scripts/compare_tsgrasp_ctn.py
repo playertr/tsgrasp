@@ -127,16 +127,16 @@ def compare(tsgrasp: LitMinkowskiGraspNet, ctn: LitTemporalContactTorchNet, test
 
         pd.to_csv(f"/home/tim/Research/tsgrasp/compare/sc_{batch_idx}.csv")
 
-        from tsgrasp.utils.metric_utils.metrics import plot_s_c_curve
-        import matplotlib.pyplot as plt
+        # from tsgrasp.utils.metric_utils.metrics import plot_s_c_curve
+        # import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots()
-        plot_s_c_curve(super_sc_ctn, ax=ax, label='CTN')
-        plot_s_c_curve(super_sc_tsgrasp, ax=ax, label='TSGrasp')
-        plot_s_c_curve(super_sc_tsgrasp_ctn, ax=ax, label='TSGrasp-CTNpts')
-        fig.legend()
+        # fig, ax = plt.subplots()
+        # plot_s_c_curve(super_sc_ctn, ax=ax, label='CTN')
+        # plot_s_c_curve(super_sc_tsgrasp, ax=ax, label='TSGrasp')
+        # plot_s_c_curve(super_sc_tsgrasp_ctn, ax=ax, label='TSGrasp-CTNpts')
+        # fig.legend()
 
-        plt.savefig(f"/home/tim/Research/tsgrasp/compare/sc_{batch_idx}.png")
+        # plt.savefig(f"/home/tim/Research/tsgrasp/compare/sc_{batch_idx}.png")
 
 # torch.mean(
 #     ((tsgrasp_confs[0] > 0.5) == tsgrasp_labels[0]).float()
