@@ -591,10 +591,14 @@ class Res16UNet34C(Res16UNet34):
 
 class STRes16UNetBase(Res16UNetBase):
 
-    CONV_TYPE = ConvType.SPATIAL_HYPERCUBE_TEMPORAL_HYPERCROSS
+    # CONV_TYPE = ConvType.SPATIAL_HYPERCUBE_TEMPORAL_HYPERCROSS
+    CONV_TYPE = ConvType.SPATIO_TEMPORAL_HYPERCROSS
+    # TIM
 
-    def __init__(self, in_channels, out_channels, config, D=4, **kwargs):
-        super(STRes16UNetBase, self).__init__(in_channels, out_channels, config, D, **kwargs)
+    # Tim -- removed `config`. Compare to
+    # https://github.com/nicolas-chaulet/torch-points3d/blob/master/torch_points3d/modules/MinkowskiEngine/res16unet.py`
+    def __init__(self, in_channels, out_channels, D=4, **kwargs):
+        super(STRes16UNetBase, self).__init__(in_channels, out_channels, D, **kwargs)
 
 
 class STRes16UNet14(STRes16UNetBase, Res16UNet14):
