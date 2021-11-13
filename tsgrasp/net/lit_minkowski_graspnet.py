@@ -57,8 +57,8 @@ class LitMinkowskiGraspNet(pl.LightningModule):
             torch.cuda.empty_cache() # recommended for Minkowski
 
         stensor = ME.SparseTensor(
-        coordinates = batch['coordinates'],
-        features = batch['features']
+            coordinates = batch['coordinates'],
+            features = batch['features']
         )
 
         class_logits, baseline_dir, approach_dir, grasp_offset = self.model.forward(stensor)
