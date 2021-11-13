@@ -73,9 +73,13 @@ class MinkowskiGraspNet(torch.nn.Module):
             class_logits,
             labels, reduction='none'
         ).ravel()
-        bce_loss = torch.mean(
-            torch.topk(bce_loss, k=int(len(bce_loss) * self.top_conf_quantile))[0]
-        )
+
+        if self.top_conf_quantile == 1.0:
+            bce_loss = torch.mean(bce_loss)
+        else:
+            bce_loss = torch.mean(
+                torch.topk(bce_loss, k=int(len(bce_loss) * self.top_conf_quantile))[0]
+            )
     
         return self.bce_loss_coeff*bce_loss
 
