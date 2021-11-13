@@ -4,6 +4,8 @@ import os
 from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint,LearningRateMonitor
 from pytorch_lightning.plugins import DDPPlugin
+import wandb
+from omegaconf import OmegaConf
 
 from hydra.utils import instantiate
 
@@ -23,10 +25,12 @@ class Trainer:
         if cfg.training.use_wandb:
             rank = os.getenv('LOCAL_RANK')
             if rank is None or rank == 0:
-                import wandb
-                wandb.init(project=cfg.training.wandb.project,
-                config=cfg,
-                name=cfg.training.wandb.experiment)
+                wandb.init(
+                    project=cfg.training.wandb.project,
+                    name=cfg.training.wandb.experiment,
+                    config=OmegaConf.to_container(cfg, resolve=True),
+                    notes=cfg.training.wandb.notes
+                )
                 wandb_logger = loggers.WandbLogger(
                     project=cfg.training.wandb.project, 
                     log_model="all", 
