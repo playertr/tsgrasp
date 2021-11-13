@@ -13,3 +13,4 @@ use_wandb: False
 wandb:
   project: "TSGrasp"
   experiment: "test"
+  notes:
