@@ -65,22 +65,23 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         B, T, N_PTS, D = positions.shape
         assert B == 1, "Only batch size of one supported for CTN."
 
-        (baseline_dir, class_logits, grasp_offset, approach_dir, pred_points
-        ) = self.model.forward(positions[0])
-        # class_logits is (B, N_PRED_PTS)
-        # baseline_dir is (B, N_PRED_PTS, 3)
-        # approach_dir is (B, N_PRED_PTS, 3)
-        # grasp_offset is (B, N_PRED_PTS, 10)
-        # pred_points is (B, N_PRED_PTS, 3)
-
         opt.zero_grad()
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         add_s_loss, class_loss, width_loss = 0., 0., 0.
-        for b in range(B):
+        for t in range(T):
+            (baseline_dir, class_logits, grasp_offset, approach_dir, pred_points
+            ) = self.model.forward(positions[0][t].unsqueeze(0))
+            # class_logits is (1, N_PRED_PTS)
+            # baseline_dir is (1, N_PRED_PTS, 3)
+            # approach_dir is (1, N_PRED_PTS, 3)
+            # grasp_offset is (1, N_PRED_PTS, 10)
+            # pred_points is (1, N_PRED_PTS, 3)
 
             ## Compute labels
             pt_labels_b, width_labels_b = self.model.class_width_labels(
-                contact_pts[b], pred_points, grasp_widths[b], 
+                contact_pts[0][t].unsqueeze(0), 
+                pred_points, 
+                grasp_widths[0][t].unsqueeze(0), 
                 self.model.pt_radius
             )
 
@@ -91,9 +92,9 @@ class LitTemporalContactTorchNet(pl.LightningModule):
                 approach_dir,
                 grasp_offset,
                 pred_points,
-                grasp_tfs[b],
+                grasp_tfs[0][t].unsqueeze(0),
                 self.model.top_conf_quantile,
-                pt_labels_b,
+                pt_labels_b[0],
                 width_labels_b
             ) 
 
