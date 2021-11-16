@@ -2,5 +2,4 @@ defaults:
   - training: default
   - model: tsgraspnet
   - data: acronymvid
-  - experiment: contact_torchnet
   - _self_
