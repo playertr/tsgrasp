@@ -5,7 +5,7 @@ defaults:
 
 data:
   data_cfg:
-    dataroot: /home/tim/Research/tsgrasp/data/acronymvid
+    dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
     points_per_frame: 45000
 
 training:
