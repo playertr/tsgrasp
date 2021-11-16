@@ -136,7 +136,7 @@ class ContactTorchNet(TSGraspSuper):
                 nn.Conv1d(128, 128, 1),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
-                nn.Conv1d(128, len(offset_bins)-1, 1)
+                nn.Conv1d(128, 1, 1)
             )
 
             # Head for contact points
