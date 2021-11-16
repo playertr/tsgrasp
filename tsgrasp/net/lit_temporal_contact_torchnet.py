@@ -66,7 +66,12 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         assert B == 1, "Only batch size of one supported for CTN."
 
 
-        losses = []        
+        losses = []   
+        pt_preds = []
+        pt_labels = []
+        add_s_losses = []
+        width_losses = []
+        class_losses = []  
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         for t in range(T):
             opt.zero_grad()
@@ -111,14 +116,42 @@ class LitTemporalContactTorchNet(pl.LightningModule):
                 opt.step()
 
             losses.append(loss.detach().cpu())
+            pt_preds.append((class_logits > 0).detach().cpu().ravel())
+            pt_labels.append(pt_labels_b.detach().cpu().ravel())
+            add_s_losses.append(add_s_loss_b.detach().cpu())
+            width_losses.append(width_loss_b.detach().cpu())
+            class_losses.append(class_loss_b.detach().cpu())
+
+        ## Log loss components
+        self.log(f"{stage}_loss", 
+            float(torch.Tensor(losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_add_s_loss", 
+            float(torch.Tensor(add_s_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_bce_loss", 
+            float(torch.Tensor(class_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_width_loss", 
+            float(torch.Tensor(width_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_accuracy", 
+            float(np.mean([accuracy(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_false_pos", 
+            float(np.mean([false_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_neg", 
+            float(np.mean([true_negative(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
 
         return {"loss": torch.mean(torch.Tensor(losses))}
-
-    def _epoch_end(self, outputs, stage=None):
-        if stage:
-            loss = np.mean([float(x['loss']) for x in outputs])
-            self.logger.log_metrics(
-                {f"{stage}/loss": loss}, self.current_epoch + 1)
 
     def training_step(self, batch, batch_idx):
         return self._step(batch, batch_idx, "train")
@@ -129,11 +162,17 @@ class LitTemporalContactTorchNet(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         return self._step(batch, batch_idx, "test")
 
-    def training_epoch_end(self, outputs):
-        self._epoch_end(outputs, "train")
+def accuracy(pred, des):
+    return float(torch.mean((pred == des).float()))
 
-    def validation_epoch_end(self, outputs):
-        self._epoch_end(outputs, "val")
+def true_positive(pred, des):
+    return float(torch.mean((des.bool()[pred.bool()].float())))
 
-    def test_epoch_end(self, outputs):
-        self._epoch_end(outputs, "test")
+def false_positive(pred, des):
+    return float(torch.mean(((~des.bool()[pred.bool()]).float())))
+
+def true_negative(pred, des):
+    return float(torch.mean((~des.bool()[~pred.bool()]).float()))
+
+def false_negative(pred, des):
+    return float(torch.mean((des.bool()[~pred.bool()]).float()))
