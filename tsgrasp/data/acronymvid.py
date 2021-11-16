@@ -2,9 +2,8 @@ import h5py
 import os
 import numpy as np
 import torch
-from tsgrasp.utils.mesh_utils.mesh_utils import create_gripper
 from omegaconf import DictConfig
-from functools import reduce
+from tsgrasp.utils.utils import transform
 
 class AcronymVidDataset(torch.utils.data.Dataset):
     """
@@ -17,7 +16,6 @@ class AcronymVidDataset(torch.utils.data.Dataset):
 
         self.root = cfg.dataroot
         self.pts_per_frame = cfg.points_per_frame
-        self.grid_size = cfg.grid_size
         self.time_decimation_factor = cfg.time_decimation_factor
 
         # Find the raw filepaths. For now, we're doing no file-based preprocessing.
@@ -92,11 +90,18 @@ class AcronymVidDataset(torch.utils.data.Dataset):
         cam_frame_pos_grasp_tfs =  np.matmul(tfs_from_obj_to_cam[:,np.newaxis,:,:], obj_frame_pos_grasp_tfs[np.newaxis,:,:,:])
         # (30, 2000, 4, 4)
 
-        pos_contact_pts_mesh = grasp_contact_points[np.where(success)]
+        pos_contact_pts_mesh = torch.Tensor(
+            grasp_contact_points[np.where(success)].astype(np.float32)
+        )
+        T = tfs_from_cam_to_obj.shape[0]
+        pos_contact_pts_cam = transform(
+            pos_contact_pts_mesh.repeat(T, 1, 1, 1),
+            torch.Tensor(tfs_from_obj_to_cam)
+        )
         data = {
             "positions" : positions,
             "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
-            "pos_contact_pts_mesh": torch.Tensor(pos_contact_pts_mesh.astype(np.float32)),
+            "pos_contact_pts_cam": pos_contact_pts_cam,
         }
 
         return data
@@ -104,6 +109,16 @@ class AcronymVidDataset(torch.utils.data.Dataset):
     @property
     def raw_dir(self):
         return self.root
+
+def ragged_collate_fn(list_data):
+    """Attempt to stack up each tensor in the dictionary. If they have incompatible sizes, return a list. """
+    data = {}
+    for key in list_data[0].keys():
+        try: 
+            data[key] = torch.stack([d[key] for d in list_data])
+        except RuntimeError:
+            data[key] = [d[key] for d in list_data]
+    return data
 
 def depth_to_pointcloud(depth, fov=np.pi/6):
     """Convert depth image to pointcloud given camera intrinsics, from acronym.scripts.acronym_render_observations
