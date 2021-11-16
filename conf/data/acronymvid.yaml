@@ -11,4 +11,4 @@ data_cfg:
   num_workers: 4
 
   time_decimation_factor: 3
-  data_proportion_per_epoch: 0.2 # portion seen in each epoch
+  data_proportion_per_epoch: 1 # portion seen in each epoch
