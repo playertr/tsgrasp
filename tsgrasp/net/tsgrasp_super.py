@@ -345,8 +345,8 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
             )
 
         else:
-            add_s_loss = torch.zeros(1, device=class_logits.device)
-            width_loss = torch.zeros(1, device=class_logits.device)
+            add_s_loss = torch.zeros(1, device=class_logits.device).squeeze()
+            width_loss = torch.zeros(1, device=class_logits.device).squeeze()
 
         ## Classification loss
         class_loss = TSGraspSuper.class_loss(
