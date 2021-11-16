@@ -1,0 +1,22 @@
+# @package _global_
+
+defaults:
+  - override /model: temporal_ctn
+
+model:
+  model_cfg:
+    top_confidence_quantile: 1.0 # Only backprop this proportion of BCE losses
+    pt_radius: 0.005
+    add_s_loss_coeff: 10
+    bce_loss_coeff: 1
+    width_loss_coeff: 1
+
+training:
+  batch_size: 1
+  gpus: 0
+
+  use_wandb: False
+  wandb:
+    project: "TSGrasp"
+    experiment: "contact_torchnet"
+    notes: "First run after Nov. 16 refactor."

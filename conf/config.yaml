@@ -1,5 +1,6 @@
 defaults:
   - training: default
-  - model: minkowski_graspnet
+  - model: tsgraspnet
   - data: acronymvid
+  - experiment: contact_torchnet
   - _self_
