@@ -65,10 +65,12 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         B, T, N_PTS, D = positions.shape
         assert B == 1, "Only batch size of one supported for CTN."
 
-        opt.zero_grad()
+
+        losses = []        
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
-        add_s_loss, class_loss, width_loss = 0., 0., 0.
         for t in range(T):
+            opt.zero_grad()
+
             (baseline_dir, class_logits, grasp_offset, approach_dir, pred_points
             ) = self.model.forward(positions[0][t].unsqueeze(0))
             # class_logits is (1, N_PRED_PTS)
@@ -98,22 +100,19 @@ class LitTemporalContactTorchNet(pl.LightningModule):
                 width_labels_b
             ) 
 
-            add_s_loss += add_s_loss_b / B
-            width_loss += width_loss_b / B
-            class_loss += class_loss_b / B
+            ## Combine loss components
+            loss = 0.0
+            loss += self.model.add_s_loss_coeff * add_s_loss_b 
+            loss += self.model.bce_loss_coeff * class_loss_b 
+            loss += self.model.width_loss_coeff * width_loss_b
 
-        ## Combine loss components
-        loss = 0.0
-        loss += self.model.add_s_loss_coeff * add_s_loss 
-        loss += self.model.bce_loss_coeff * class_loss 
-        loss += self.model.width_loss_coeff * width_loss
+            if stage == "train":
+                self.manual_backward(loss)
+                opt.step()
 
-        
-        if stage == "train":
-            self.manual_backward(loss)
-            opt.step()
+            losses.append(float(loss))
 
-        return {"loss": loss}
+        return {"loss": np.mean(losses)}
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
