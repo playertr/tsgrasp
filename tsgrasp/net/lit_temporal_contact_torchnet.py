@@ -110,9 +110,9 @@ class LitTemporalContactTorchNet(pl.LightningModule):
                 self.manual_backward(loss)
                 opt.step()
 
-            losses.append(float(loss))
+            losses.append(loss.detach().cpu())
 
-        return {"loss": np.mean(losses)}
+        return {"loss": torch.mean(torch.Tensor(losses))}
 
     def _epoch_end(self, outputs, stage=None):
         if stage:
