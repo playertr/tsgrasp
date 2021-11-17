@@ -12,7 +12,6 @@ class TSGraspNet(TSGraspSuper):
     def __init__(self, cfg : DictConfig):
         super().__init__()
 
-        self.use_parallel_add_s = cfg.use_parallel_add_s
         self.add_s_loss_coeff = cfg.add_s_loss_coeff
         self.bce_loss_coeff = cfg.bce_loss_coeff
         self.width_loss_coeff = cfg.width_loss_coeff
