@@ -11,7 +11,7 @@ model_cfg:
   add_s_loss_coeff: 10
   bce_loss_coeff: 1
   width_loss_coeff: 1
-  top_confidence_quantile: 0.25 # Only backprop this proportion of BCE losses
+  top_confidence_quantile: 1.0 # Only backprop this proportion of BCE losses
   use_parallel_add_s: False
   feature_dimension: 1
   pt_radius: 0.005
