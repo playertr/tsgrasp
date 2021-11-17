@@ -3,9 +3,8 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
 
 import pyglet
-pyglet.options['headless'] = True
+# pyglet.options['headless'] = True
 
-from pyglet import gl
 import trimesh
 from PIL import Image
 import io
@@ -26,7 +25,7 @@ class GraspAnimationLogger(Callback):
         pts = self.batch['positions'].to(pl_module.device)
         outputs = pl_module.forward(pts)
 
-        gif_paths = animate_grasps_from_outputs(outputs, pts)
+        gif_paths = animate_grasps_from_outputs(outputs)
 
         ## Send to C L O U D
         # wandb.log({
@@ -34,13 +33,14 @@ class GraspAnimationLogger(Callback):
         #                       for path in gif_paths]
         #     })
 
-    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_test_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
+
+        ## Run forward inference on this batch
         pts = batch['positions'].to(pl_module.device)
-        outputs = [item.to(pl_module.device) for item in outputs['outputs']]
-        animate_grasps_from_outputs(outputs, pts, name=f"new_batch_{batch_idx}")
-
-
-def animate_grasps_from_outputs(outputs, pts, name=""):
+        outputs = pl_module.forward(pts)
+        animate_grasps_from_outputs(outputs, name=f"new_batch_{batch_idx}")
+        
+def animate_grasps_from_outputs(outputs, name=""):
     """
     Save GIFs overlaying the predicted grasps on the points clouds.
     Returns a list of CPU tensor animations.
@@ -49,7 +49,7 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     pts: point cloud. (N_BATCH, N_TIME, N_PT, 3)
     """
 
-    class_logits, baseline_dir, approach_dir, grasp_offset = outputs
+    class_logits, baseline_dir, approach_dir, grasp_offset, pts = outputs
 
     ## Select the top 50 most likely grasps from each time step, for each 
     # batch.
@@ -123,9 +123,8 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
         )
     )
     scene.camera_transform = cam_pose
-
-    window_conf = gl.Config(double_buffer=True, depth_size=24) 
-    data = scene.save_image(resolution=res, window_conf=window_conf, visible=False) 
+    scene.show(viewer='gl')
+    data = scene.save_image(resolution=res, visible=False) 
     im = Image.open(io.BytesIO(data))
     return np.asarray(im)
 
