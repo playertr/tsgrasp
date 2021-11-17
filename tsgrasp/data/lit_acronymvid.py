@@ -31,7 +31,7 @@ class LitAcronymvidDataset(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=ragged_collate_fn,
         sampler=RandomSampler(self.dataset_val, 
-            num_samples=int(len(self.dataset_val)*self.data_cfg.data_proportion_per_epoch))
+            num_samples=min(100, int(len(self.dataset_val)*self.data_cfg.data_proportion_per_epoch)))
         )
 
     def test_dataloader(self):
