@@ -84,6 +84,11 @@ class LitTSGraspNet(pl.LightningModule):
         grasp_offset = grasp_offset.reshape(B, T, N_PTS, 1)
 
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
+        pt_preds = []
+        pt_labels = []
+        add_s_losses = []
+        width_losses = []
+        class_losses = []  
         add_s_loss, class_loss, width_loss = 0., 0., 0.
         for b in range(B):
 
@@ -110,10 +115,11 @@ class LitTSGraspNet(pl.LightningModule):
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
 
-        ## Log loss components
-        self.log(f"{stage}_add_s_loss", add_s_loss, on_step=True, on_epoch=True, sync_dist=True)
-        self.log(f"{stage}_bce_loss", class_loss, on_step=True, on_epoch=True, sync_dist=True)
-        self.log(f"{stage}_width_loss", width_loss, on_step=True, on_epoch=True, sync_dist=True)
+            pt_preds.append((class_logits[b] > 0).detach().cpu().ravel())
+            pt_labels.append(pt_labels_b.detach().cpu().ravel())
+            add_s_losses.append(add_s_loss_b.detach().cpu())
+            width_losses.append(width_loss_b.detach().cpu())
+            class_losses.append(class_loss_b.detach().cpu())
 
         ## Combine loss components
         loss = 0.0
@@ -121,54 +127,40 @@ class LitTSGraspNet(pl.LightningModule):
         loss += self.model.bce_loss_coeff * class_loss 
         loss += self.model.width_loss_coeff * width_loss
 
+
+        ## Log loss components
+        self.log(f"{stage}_loss", 
+            float(loss), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_add_s_loss", 
+            float(torch.Tensor(add_s_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_bce_loss", 
+            float(torch.Tensor(class_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_width_loss", 
+            float(torch.Tensor(width_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_accuracy", 
+            float(np.mean([accuracy(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_false_pos", 
+            float(np.mean([false_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_neg", 
+            float(np.mean([true_negative(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+
         return {
             'loss': loss
         }
 
-    # def training_step_end(self, outputs):
-    #     self.log('train_pt_acc', accuracy(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('train_pt_true_pos', true_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('train_pt_false_pos', false_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('train_pt_true_neg', true_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('train_pt_false_neg', false_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('training_loss', float(outputs['loss']), on_step=True, on_epoch=True, sync_dist=True)
-
-    # def validation_step_end(self, outputs):
-    #     self.log('val_pt_acc', accuracy(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('val_pt_true_pos', true_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('val_pt_false_pos', false_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('val_pt_true_neg', true_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('val_pt_false_neg', false_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('val_loss', float(outputs['loss']), on_step=True, on_epoch=True, sync_dist=True)
-
-    # def test_step_end(self, outputs):
-    #     self.log('test_pt_acc', accuracy(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('test_pt_true_pos', true_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('test_pt_false_pos', false_positive(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('test_pt_true_neg', true_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('test_pt_false_neg', false_negative(
-    #         outputs['pt_preds'], outputs['pt_labels']), on_step=True, on_epoch=True, sync_dist=True)
-    #     self.log('test_loss', float(outputs['loss']), on_step=True, on_epoch=True, sync_dist=True)
-
-    def _epoch_end(self, outputs, stage=None):
-        if stage:
-            loss = np.mean([float(x['loss']) for x in outputs])
-            self.logger.log_metrics(
-                {f"{stage}/loss": loss}, self.current_epoch + 1)
     
     # on_train_start()
     # for epoch in epochs:
@@ -197,15 +189,6 @@ class LitTSGraspNet(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         return self._step(batch, batch_idx, "test")
-
-    def training_epoch_end(self, outputs):
-        self._epoch_end(outputs, "train")
-
-    def validation_epoch_end(self, outputs):
-        self._epoch_end(outputs, "val")
-
-    def test_epoch_end(self, outputs):
-        self._epoch_end(outputs, "test")
 
 def accuracy(pred, des):
     return float(torch.mean((pred == des).float()))
