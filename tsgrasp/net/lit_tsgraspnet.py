@@ -43,6 +43,7 @@ class LitTSGraspNet(pl.LightningModule):
             baseline_dir (torch.Tensor): (B, T, N_PTS, 3) gripper baseline direction
             approach_dir (torch.Tensor): (B, T, N_PTS, 3) gripper approach direction
             grasp_offset (torch.Tensor): (B, T, N_PTS, 1) gripper width
+            pred_points  (torch.Tensor): (B, T, N_PTS, 1) contact points that were evaluated. The same as positions, in this implementation.
         """
         B, T, N_PTS, D = positions.shape
 
@@ -64,7 +65,7 @@ class LitTSGraspNet(pl.LightningModule):
         approach_dir = approach_dir.reshape(B, T, N_PTS, 3)
         grasp_offset = grasp_offset.reshape(B, T, N_PTS, 1)
 
-        return class_logits, baseline_dir, approach_dir, grasp_offset
+        return class_logits, baseline_dir, approach_dir, grasp_offset, positions
 
 
 
@@ -103,7 +104,7 @@ class LitTSGraspNet(pl.LightningModule):
         B, T, N_PTS, D = positions.shape
 
         ## Make predictions 
-        class_logits, baseline_dir, approach_dir, grasp_offset = self.forward(positions)
+        class_logits, baseline_dir, approach_dir, grasp_offset, _ = self.forward(positions)
 
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         pt_preds = []
@@ -145,8 +146,8 @@ class LitTSGraspNet(pl.LightningModule):
 
         ## Combine loss components
         loss = 0.0
-        loss += self.model.add_s_loss_coeff * add_s_loss 
-        loss += self.model.bce_loss_coeff * class_loss 
+        loss += self.model.add_s_loss_coeff * add_s_loss
+        loss += self.model.bce_loss_coeff * class_loss
         loss += self.model.width_loss_coeff * width_loss
 
 
