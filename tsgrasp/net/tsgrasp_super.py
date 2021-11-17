@@ -73,7 +73,7 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         width_labels = torch.nan_to_num(width_labels)
         width_mse = (width_preds.ravel() - width_labels.ravel())**2
         width_mse = width_mse[pt_labels.bool().ravel() & ~offset_label_nan]
-        width_loss = torch.mean(width_mse) if len(width_mse > 0) else 0.0
+        width_loss = torch.mean(width_mse) if len(width_mse > 0) else torch.zeros(1, device=width_preds.device).squeeze()
 
         return width_loss
 
@@ -97,7 +97,7 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         """
 
         if len(pos_grasp_tfs) == 0: 
-            return torch.zeros(1, device=approach_dir.device)
+            return torch.zeros(1, device=approach_dir.device).squeeze()
 
         ## Retrieve ground truth control point tensors
         pos_control_points = TSGraspSuper.control_point_tensors(pos_grasp_tfs)
