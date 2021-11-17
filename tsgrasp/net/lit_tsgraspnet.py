@@ -1,3 +1,4 @@
+from typing import Tuple
 from omegaconf.dictconfig import DictConfig
 import torch
 import numpy as np
@@ -29,8 +30,43 @@ class LitTSGraspNet(pl.LightningModule):
         }
         return [optimizer], [lr_scheduler]
 
-    def forward(self,x):
-        return self.model.forward(x)
+    def forward(self, positions: torch.Tensor) -> Tuple[torch.Tensor, torch.TensorType, torch.Tensor, torch.Tensor]:
+        """Calculate the grasp parameters from a batched point cloud of positions.
+
+        For the sparse convolution, these positions should already be quantized.
+
+        Args:
+            positions (torch.Tensor): (B, T, N_PTS, 3) point cloud
+
+        Returns:
+            class_logits (torch.Tensor): (B, T, N_PTS, 1) classification logits
+            baseline_dir (torch.Tensor): (B, T, N_PTS, 3) gripper baseline direction
+            approach_dir (torch.Tensor): (B, T, N_PTS, 3) gripper approach direction
+            grasp_offset (torch.Tensor): (B, T, N_PTS, 1) gripper width
+        """
+        B, T, N_PTS, D = positions.shape
+
+        ## Make predictions. Do this in parallel.
+        # Convert point positions into a Minkowski SparseTensor
+        voxelized_pos = discretize(positions, grid_size=self.model.grid_size)
+        coords = multi_pointcloud_to_4d_coords(voxelized_pos)
+        feats = torch.ones((len(coords), 1), device=coords.device)
+        stensor = ME.SparseTensor(
+            coordinates = coords,
+            features = feats
+        )
+
+        # Make predictions
+        class_logits, baseline_dir, approach_dir, grasp_offset = self.model.forward(stensor)
+
+        class_logits = class_logits.reshape(B, T, N_PTS, 1)
+        baseline_dir = baseline_dir.reshape(B, T, N_PTS, 3)
+        approach_dir = approach_dir.reshape(B, T, N_PTS, 3)
+        grasp_offset = grasp_offset.reshape(B, T, N_PTS, 1)
+
+        return class_logits, baseline_dir, approach_dir, grasp_offset
+
+
 
     def _step(self, batch: dict,  batch_idx: int, stage: str=None) -> dict:
         """Run inference, compute labels, and compute a loss for a given batch of data.
@@ -66,22 +102,8 @@ class LitTSGraspNet(pl.LightningModule):
 
         B, T, N_PTS, D = positions.shape
 
-        ## Make predictions. Do this in parallel.
-        # Convert point positions into a Minkowski SparseTensor
-        voxelized_pos = discretize(positions, grid_size=self.model.grid_size)
-        coords = multi_pointcloud_to_4d_coords(voxelized_pos)
-        feats = torch.ones((len(coords), 1), device=coords.device)
-        stensor = ME.SparseTensor(
-            coordinates = coords,
-            features = feats
-        )
-
-        # Make predictions
-        class_logits, baseline_dir, approach_dir, grasp_offset = self.model.forward(stensor)
-        class_logits = class_logits.reshape(B, T, N_PTS, 1)
-        baseline_dir = baseline_dir.reshape(B, T, N_PTS, 3)
-        approach_dir = approach_dir.reshape(B, T, N_PTS, 3)
-        grasp_offset = grasp_offset.reshape(B, T, N_PTS, 1)
+        ## Make predictions 
+        class_logits, baseline_dir, approach_dir, grasp_offset = self.forward(positions)
 
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         pt_preds = []

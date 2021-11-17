@@ -1,6 +1,9 @@
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import Callback, base
+from pytorch_lightning.callbacks import Callback
+
+import pyglet
+pyglet.options['headless'] = True
 
 from pyglet import gl
 import trimesh
@@ -11,7 +14,6 @@ from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
 import MinkowskiEngine as ME
 import imageio
 import os
-import wandb
 
 class GraspAnimationLogger(Callback):
     def __init__(self, example_batch: dict):
@@ -21,19 +23,16 @@ class GraspAnimationLogger(Callback):
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
 
         ## Run forward inference on the example batch
-        stensor = ME.SparseTensor(
-            coordinates = self.batch['coordinates'].to(pl_module.device),
-            features = self.batch['features'].to(pl_module.device))
-        outputs = pl_module.model.forward(stensor)
         pts = self.batch['positions'].to(pl_module.device)
+        outputs = pl_module.forward(pts)
 
         gif_paths = animate_grasps_from_outputs(outputs, pts)
 
         ## Send to C L O U D
-        wandb.log({
-            "val/examples": [wandb.Image(path) 
-                              for path in gif_paths]
-            })
+        # wandb.log({
+        #     "val/examples": [wandb.Image(path) 
+        #                       for path in gif_paths]
+        #     })
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         pts = batch['positions'].to(pl_module.device)
@@ -49,15 +48,8 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     outputs: raw grasp parameters from module. (N_BATCH*N_TIME*N_PT, W_i)
     pts: point cloud. (N_BATCH, N_TIME, N_PT, 3)
     """
-    ## Package each grasp parameter P into a regular, dense Tensor of shape
-    # (BATCH, TIME, N_PRED_GRASP, *P.shape)
+
     class_logits, baseline_dir, approach_dir, grasp_offset = outputs
-    n_batch = pts.shape[0]
-    n_time = pts.shape[1]
-    class_logits = class_logits.view(n_batch, n_time, -1, 1)
-    approach_dir = approach_dir.view(n_batch, n_time, -1, 3)
-    baseline_dir = baseline_dir.view(n_batch, n_time, -1, 3)
-    grasp_offset = grasp_offset.view(n_batch, n_time, -1, 1)
 
     ## Select the top 50 most likely grasps from each time step, for each 
     # batch.
