@@ -268,17 +268,21 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
             Tuple[torch.Tensor, torch.Tensor]: (T, N_PTS, 1) boolean point label and (T, N_PTS, 1) float width label.
         """
 
-        T, N_PTS, D = positions.shape
+        T, N_PTS, _3 = positions.shape
 
-        if contact_pts.shape[1] == 0:
-            return torch.zeros((T, N_PTS, 1), dtype=bool, device=contact_pts.device), None
-
-        ## Class labels
+        ## Stack and nan-filter contact points
         # Concatenate the left and right contact points
         contact_pts = torch.cat([
             contact_pts[:,:,0,:], contact_pts[:,:,1,:]
             ], dim=-2
         ) # (T, 2N_GT_GRASPS_i, 3)
+        # Filter away nans
+        contact_pts = contact_pts[~contact_pts.isnan()].reshape(T, -1, 3)
+
+        if contact_pts.shape[1] == 0:
+            return torch.zeros((T, N_PTS, 1), dtype=bool, device=contact_pts.device), None
+
+        ## Class labels
         # Find closest ground truth points for labeling
         dists, min_idcs = TSGraspSuper.closest_points(
             positions,
