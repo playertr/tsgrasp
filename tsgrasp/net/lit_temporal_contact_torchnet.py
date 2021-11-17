@@ -9,6 +9,7 @@ import torch
 from tsgrasp.net.contact_torchnet import ContactTorchNet
 import pytorch_lightning as pl
 import numpy as np
+from typing import Tuple
 
 class LitTemporalContactTorchNet(pl.LightningModule):
     def __init__(self, model_cfg : DictConfig, training_cfg : DictConfig):
@@ -39,8 +40,33 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         }
         return [optimizer], [lr_scheduler]
 
-    def forward(self,x):
-        return self.model.forward(x)
+    def forward(self, positions: torch.Tensor) -> Tuple[torch.Tensor, torch.TensorType, torch.Tensor, torch.Tensor]:
+        """Calculate the grasp parameters from a batched point cloud of positions.
+
+        For the sparse convolution, these positions should already be quantized.
+
+        Args:
+            positions (torch.Tensor): (B, T, N_PTS, 3) point cloud
+
+        Returns:
+            class_logits (torch.Tensor): (B, T, N_PRED_PTS, 1) classification logits
+            baseline_dir (torch.Tensor): (B, T, N_PRED_PTS, 3) gripper baseline direction
+            approach_dir (torch.Tensor): (B, T, N_PRED_PTS, 3) gripper approach direction
+            grasp_offset (torch.Tensor): (B, T, N_PRED_PTS, 1) gripper width
+        """
+        B, T, N_PTS, D = positions.shape
+
+        # Make predictions
+
+        (baseline_dir, class_logits, grasp_offset, approach_dir, pred_points
+        ) = self.model.forward(positions.reshape(-1, N_PTS, 3))
+
+        class_logits = class_logits.reshape(B, T, -1, 1)
+        baseline_dir = baseline_dir.reshape(B, T, -1, 3)
+        approach_dir = approach_dir.reshape(B, T, -1, 3)
+        grasp_offset = grasp_offset.reshape(B, T, -1, 1)
+
+        return class_logits, baseline_dir, approach_dir, grasp_offset, pred_points.unsqueeze(0)
 
     def _step(self, batch, batch_idx, stage=None):
         opt = self.optimizers()
@@ -74,7 +100,8 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         class_losses = []  
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         for t in range(T):
-            opt.zero_grad()
+            if stage == "train":
+                opt.zero_grad()
 
             (baseline_dir, class_logits, grasp_offset, approach_dir, pred_points
             ) = self.model.forward(positions[0][t].unsqueeze(0))
