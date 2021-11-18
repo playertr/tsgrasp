@@ -103,8 +103,8 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         pos_control_points = TSGraspSuper.control_point_tensors(pos_grasp_tfs)
         sym_pos_control_points = TSGraspSuper.control_point_tensors(pos_grasp_tfs, symmetric=True)
 
-        ## Retrieve 6-DOF transformations
-        grasp_tfs = TSGraspSuper.build_6dof_grasps(
+        ## Retrieve 6-DOF predicted grasp transformations
+        pred_grasp_tfs = TSGraspSuper.build_6dof_grasps(
             contact_pts=positions,
             baseline_dir=baseline_dir,
             approach_dir=approach_dir,
@@ -113,7 +113,7 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
 
         ## Construct control points for the predicted grasps, where label is True.
         pred_cp = TSGraspSuper.control_point_tensors(
-            grasp_tfs, symmetric=False
+            pred_grasp_tfs, symmetric=False
         ) # (V, 5, 3)
 
         ## Find the minimum pairwise distance from each predicted grasp to the ground truth grasps.
@@ -237,9 +237,7 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         ) # (N, 1)
 
         # Select the full 5x3 matrix corresponding to each minimum-distance grasp.
-        # We use a flattened index to avoid buffoonery with torch.gather that would prevent us from generalizing to arbitrary prepended batch shapes.
-        des_shape = (*best_idxs.shape, 5, 3)
-        closest_gt_cps = gt_cp.reshape(-1, 5, 3)[best_idxs.ravel()].reshape(des_shape)
+        closest_gt_cps = multi_dim_index(gt_cp, best_idxs)
 
         # Find the matrix L2 distances
         best_l2_dists = torch.sqrt(
@@ -411,3 +409,26 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
     def gripper_depth():
         """Retrieve the distance from the contact point to the gripper wrist along the gripper approach direction."""
         return 0.1034
+
+def multi_dim_index(T: torch.Tensor, idx: torch.LongTensor) -> torch.Tensor:
+    """Index into tensor `T`  with multi-dimensional index tensor `idx`.
+    This operation automates the lengthy `torch.gather` call that is needed to index into a tensor of shape (*shape, B, ...) with an index of shape (*shape, C).
+
+    > foo = torch.rand(1234, 10, 3, 7)
+    > baz = torch.randint(10, size=(1234, 2))
+    > bar = multi_dim_index(foo, bar)               # (1234, 3, 3, 7)
+
+    Args:
+        T (torch.Tensor): (*shape, B, *endshape) input tensor 
+        idx (torch.LongTensor): (*shape, C)
+
+    Returns:
+        torch.Tensor: [description]
+    """
+    endshape = T.shape[idx.ndim:]
+    return torch.gather(
+        T,
+        dim=idx.ndim-1,
+        index=idx.reshape(*idx.shape, *[1]*(len(endshape))
+        ).repeat(*[1]*idx.ndim, *endshape)
+    )
