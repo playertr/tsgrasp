@@ -120,7 +120,7 @@ class LitTSGraspNet(pl.LightningModule):
                 contact_pts[b], positions[b], grasp_widths[b], 
                 self.model.pt_radius
             )
-
+            
             ## Compute losses
             add_s_loss_b, width_loss_b, class_loss_b = self.model.losses(
                 class_logits[b],
@@ -132,7 +132,7 @@ class LitTSGraspNet(pl.LightningModule):
                 self.model.top_conf_quantile,
                 pt_labels_b,
                 width_labels_b
-            ) 
+            )
 
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
@@ -178,6 +178,9 @@ class LitTSGraspNet(pl.LightningModule):
             on_step=True, on_epoch=True, sync_dist=True)
         self.log(f"{stage}_pt_true_pos", 
             float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_recall", 
+            float(np.mean([recall(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
             on_step=True, on_epoch=True, sync_dist=True)
 
         return {
@@ -227,3 +230,6 @@ def true_negative(pred, des):
 
 def false_negative(pred, des):
     return float(torch.mean((des.bool()[~pred.bool()]).float()))
+
+def recall(pred, label):
+    return float(torch.mean(pred.bool()[label.bool()].float()))
