@@ -16,3 +16,5 @@ model_cfg:
   feature_dimension: 1
   pt_radius: 0.005
   grid_size: 0.005
+  conv1_kernel_size: 5
+  dilations: [1 1 1 1]
