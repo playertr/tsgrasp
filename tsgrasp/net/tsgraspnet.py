@@ -20,7 +20,8 @@ class TSGraspNet(TSGraspSuper):
         self.grid_size = cfg.grid_size
 
         self.backbone = initialize_minkowski_unet(
-            cfg.backbone_model_name, cfg.feature_dimension, cfg.backbone_out_dim, D=cfg.D
+            cfg.backbone_model_name, cfg.feature_dimension, cfg.backbone_out_dim, D=cfg.D, conv1_kernel_size=cfg.conv1_kernel_size,
+            dilations=cfg.dilations
         )
         self.classification_head = nn.Sequential(
             nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
