@@ -7,7 +7,8 @@ import os
 def main(cfg):
     api = wandb.Api()
     artifact = api.artifact(cfg.artifact_name, type='model')
-    artifact_dir = artifact.download(root=cfg.download_path)
+    os.makedirs(cfg.download_dir, exist_ok=True)
+    artifact_dir = artifact.download(root=cfg.download_dir)
 
 if __name__ == "__main__":
     main()

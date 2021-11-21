@@ -1,5 +1,5 @@
 # @package _global_
 
-download_name: ??? # like tsgrasp_model.ckpt
+download_name: ??? # like tsgrasp_model
 artifact_name: ??? # like playertr/TSGrasp/model-12halw94:v11
-download_path: ${hydra:runtime.cwd}/ckpts/${download_name}
+download_dir: ${hydra:runtime.cwd}/ckpts/${download_name}
