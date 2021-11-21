@@ -134,6 +134,13 @@ class LitTSGraspNet(pl.LightningModule):
                 width_labels_b
             )
 
+            pred = class_logits[b] > 0
+            label = pt_labels_b
+            print(f"Predicted grasps: \t{pred.sum()}")
+            print(f"Actual grasps: \t{label.sum()}")
+            print(f"Precision: \t{true_positive(pred, label)}")
+            print(f"Recall: \t{recall(pred, label)}")
+
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
@@ -164,7 +171,7 @@ class LitTSGraspNet(pl.LightningModule):
         self.log(f"{stage}_width_loss", 
             float(torch.Tensor(width_losses).mean()), 
             on_step=True, on_epoch=True, sync_dist=True)
-        self.log(f"{stage}_accuracy", 
+        self.log(f"{stage}_pt_accuracy", 
             float(np.mean([accuracy(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
             on_step=True, on_epoch=True, sync_dist=True)
         self.log(f"{stage}_pt_true_pos", 
@@ -186,7 +193,6 @@ class LitTSGraspNet(pl.LightningModule):
         return {
             'loss': loss
         }
-
     
     # on_train_start()
     # for epoch in epochs:
@@ -214,7 +220,8 @@ class LitTSGraspNet(pl.LightningModule):
         return self._step(batch, batch_idx, "val")
 
     def test_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, "test")
+        # return self._step(batch, batch_idx, "test")
+        pass
 
 def accuracy(pred, des):
     return float(torch.mean((pred == des).float()))
