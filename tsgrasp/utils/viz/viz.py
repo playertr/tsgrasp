@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
 
 import pyglet
-# pyglet.options['headless'] = True
+pyglet.options['headless'] = True
 
 import trimesh
 from PIL import Image
@@ -38,8 +38,8 @@ class GraspAnimationLogger(Callback):
         ## Run forward inference on this batch
         pts = batch['positions'].to(pl_module.device)
         outputs = pl_module.forward(pts)
-        animate_grasps_from_outputs(outputs, name=f"new_batch_{batch_idx}")
-        
+        animate_grasps_from_outputs(outputs, name=f"11_17_kern5/{batch_idx}")
+
 def animate_grasps_from_outputs(outputs, name=""):
     """
     Save GIFs overlaying the predicted grasps on the points clouds.
@@ -51,14 +51,17 @@ def animate_grasps_from_outputs(outputs, name=""):
 
     class_logits, baseline_dir, approach_dir, grasp_offset, pts = outputs
 
-    ## Select the top 50 most likely grasps from each time step, for each 
-    # batch.
+    contact_pts = pts
+    # ## Select the top 50 most likely grasps from each time step, for each 
+    # # batch.
     confs = torch.sigmoid(class_logits)
-    _, idxs = torch.topk(confs, k=100, dim=2)
-    contact_pts = torch.gather(pts, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    baseline_dir = torch.gather(baseline_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    approach_dir = torch.gather(approach_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    grasp_offset = torch.gather(grasp_offset, dim=2, index=idxs)
+    # _, idxs = torch.topk(confs, k=100, dim=2)
+
+    # contact_pts = torch.gather(pts, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # baseline_dir = torch.gather(baseline_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # approach_dir = torch.gather(approach_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # grasp_offset = torch.gather(grasp_offset, dim=2, index=idxs)
+
 
     ## Construct the 4x4 grasp poses
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
@@ -106,6 +109,8 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
     pitch: pitch angle of new camera perspective. 0.55*2*np.pi works well.
     """
 
+    grasp_tfs = [grasp_tfs[i] for i in range(len(grasp_tfs)) if confs[i] > 0.5]
+
     pcl = trimesh.points.PointCloud(vertices=pts, r=100)
     pcl.visual.vertex_colors = trimesh.visual.interpolate(confs, color_map='viridis') # or color by depth: pts[:,2]
 
@@ -123,7 +128,7 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
         )
     )
     scene.camera_transform = cam_pose
-    scene.show(viewer='gl')
+    # scene.show(viewer='gl')
     data = scene.save_image(resolution=res, visible=False) 
     im = Image.open(io.BytesIO(data))
     return np.asarray(im)
