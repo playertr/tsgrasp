@@ -5,6 +5,12 @@ _target_: tsgrasp.net.lit_temporal_contact_torchnet.LitTemporalContactTorchNet
 
 # Params for Pytorch module
 model_cfg:
+  pt_radius: 0.005
+  top_confidence_quantile: 1.0
+  add_s_loss_coeff: 10
+  bce_loss_coeff: 1
+  width_loss_coeff: 1
+  
   DATA:
     classes: null
     data_path: acronym
