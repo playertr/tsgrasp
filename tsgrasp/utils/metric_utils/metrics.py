@@ -65,8 +65,18 @@ def coverage(pos_pred_grasp_locs, pos_gt_grasp_locs, radius=0.005):
     closest_dists, idxs = dists.min(axis=1)
     return (closest_dists < radius).float().sum() / len(pos_gt_grasp_locs)
 
-def success_coverage_curve(confs, pred_grasp_locs, gt_labels, pos_gt_grasp_locs):
-    """Determine the success and coverage at various threshold confidence values."""
+def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, gt_labels: torch.Tensor, pos_gt_grasp_locs: torch.Tensor) -> pd.DataFrame:
+    """Determine the success and coverage at various threshold confidence values.
+
+    Args:
+        confs (torch.Tensor): (N_PTS, 1) confidence values in (0, 1)
+        pred_grasp_locs (torch.Tensor): (N_PTS, 3) predicted contact points
+        gt_labels (torch.Tensor): (N_PTS, 1) contact point labels
+        pos_gt_grasp_locs (torch.Tensor): (N_GT_PTS, 3) ground truth contact points
+
+    Returns:
+        pd.DataFrame: dataframe of confidence thresholds and their corresponding success and coverage values.
+    """
 
     res = []
     thresholds = torch.linspace(0, 1, 1000)
@@ -75,7 +85,7 @@ def success_coverage_curve(confs, pred_grasp_locs, gt_labels, pos_gt_grasp_locs)
     # thresholds = [torch.quantile(confs, q) for q in quantiles]
 
     for t in thresholds:
-        pred_classes = confs > t
+        pred_classes = (confs > t).squeeze()
         pos_pred_grasp_locs = pred_grasp_locs[pred_classes == 1, :]
         res.append({
             "confidence": t,
