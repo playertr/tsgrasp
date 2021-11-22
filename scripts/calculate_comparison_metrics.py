@@ -55,7 +55,7 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
             precision_recall_curve(ts_confs, ts_labels)
         )
         ctn_pr_curves.append(
-            precision_recall_curve(ts_confs, ts_labels)
+            precision_recall_curve(ctn_confs, ctn_labels)
         )
 
     ## Concatenate the outputs from every example and compute aggregated curves
@@ -95,7 +95,7 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
 
     # Precision-recall curves
     ts_pr_curves.to_csv(cfg.tsgrasp_pr_csv_path)
-    ctn_curves.to_csv(cfg.ctn_pr_csv_path)
+    ctn_pr_curves.to_csv(cfg.ctn_pr_csv_path)
 
     ## Plot curves
     # Success-coverage curves
