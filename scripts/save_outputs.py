@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 import torch
 
-@hydra.main(config_path="../conf", config_name="save_outputs")
+@hydra.main(config_path="../conf", config_name="scripts/save_outputs")
 def main(cfg : DictConfig):
         
     pl_model = instantiate(cfg.model, training_cfg=cfg.training)
@@ -64,7 +64,35 @@ def evaluate(pl_model, dl, h5_ds):
             grp.create_dataset(
                 "positions", positions[b].shape, data=positions[b].detach().cpu(), compression="gzip", compression_opts=9
             )
+
+            ## Retrieve contact points
+            cp = unstack_contact_points(batch['pos_contact_pts_cam'][b])
+            T, N, _3 = cp.shape
+            cp = cp[~cp.isnan()].reshape(T, -1, 3).to(pl_model.device)
+
+            ## Compute distance-based point labels
+            if cp.shape[1] > 0:
+                dists, _ = pl_model.model.closest_points(
+                    positions[b],
+                    cp
+                )
+                pt_labels = (dists < pl_model.model.pt_radius).unsqueeze(-1)
+            else:
+                pt_labels = torch.zeros_like(class_logits[b], dtype=bool)
+
+            grp.create_dataset(
+                "gt_contact_pts", cp.shape, data=cp.cpu(), compression="gzip", compression_opts=9
+            )
+
+            grp.create_dataset(
+                "pt_labels", pt_labels.shape, data=pt_labels.cpu(), compression="gzip", compression_opts=9
+            )
+            
             example_num += 1
+
+def unstack_contact_points(cp):
+    """Change contact point tensor from (T, N_GT_GRASPS, 2, 3) to (T, 2*G_GT_GRASPS, 3"""
+    return torch.cat([cp[...,0,:], cp[...,1,:]], dim=-2)
 
 if __name__ == "__main__":
     main()
