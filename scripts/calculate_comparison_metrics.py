@@ -59,7 +59,8 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
     fig, ax = plt.subplots()
 
     plot_s_c_curve(ts_curve, ax=ax, label='tsgraspnet')
-    plot_s_c_curve(ctn_curve, label='CTN')
+    plot_s_c_curve(ctn_curve, ax=ax, label='CTN')
+    fig.legend()
 
     plt.savefig(cfg.png_path)
 
