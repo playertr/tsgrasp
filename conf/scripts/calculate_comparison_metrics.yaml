@@ -4,6 +4,8 @@
 # ctn_output_path: ???
 
 gpus: 1
+success_radius: 0.02
+test_run: False
 # tsgrasp_output_name: ??? # tsgraspnet_11_17
 # ctn_output_name: ??? # ctn_11_17
 tsgrasp_output_name: tsgraspnet_11_17

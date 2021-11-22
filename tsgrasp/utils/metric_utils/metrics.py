@@ -45,28 +45,35 @@ class SCCurve(Callback):
                 plot = plot_sc_curve(curve, ax=ax)
                 plt.pause(0.001)
 
-
 def success_from_labels(pred_classes, actual_classes):
     """Return success, as proportion, from ground-truth point labels.
     
     (correct positive predictions) / (total positive predictions)"""
-    return torch.mean(actual_classes[pred_classes==1].float())
+    n_pred_pos = (pred_classes == 1).sum()
+    n_correctly_pred_pos = (actual_classes[pred_classes==1]).sum()
+    return n_correctly_pred_pos/n_pred_pos, n_correctly_pred_pos, n_pred_pos
 
 def coverage(pos_pred_grasp_locs, pos_gt_grasp_locs, radius=0.005):
     """Get the proportion of ground truth grasps within epsilon of predicted.
     
     (gt close to predicted) / (total gt)
     """
-    if pos_gt_grasp_locs.shape[0] == 0: return torch.Tensor([float('nan')])
-    if pos_pred_grasp_locs.shape[0] == 0: return torch.Tensor([0.0])
+    n_gt_points = len(pos_gt_grasp_locs)
+
+    if n_gt_points == 0: return torch.Tensor([float('nan')]), 0, n_gt_points
+    if pos_pred_grasp_locs.shape[0] == 0: return torch.Tensor([0.0]), 0, n_gt_points
 
     # for each grasp coordinate in gt_grasps, find the distance to every grasp grasp_coordinate in pred_grasps
     dists = torch.cdist(pos_gt_grasp_locs, pos_pred_grasp_locs) # (n_gt, n_pred)
 
     closest_dists, idxs = dists.min(axis=1)
-    return (closest_dists < radius).float().sum() / len(pos_gt_grasp_locs)
 
-def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, gt_labels: torch.Tensor, pos_gt_grasp_locs: torch.Tensor) -> pd.DataFrame:
+    
+    n_covered_gt_points =  (closest_dists < radius).float().sum()
+
+    return n_covered_gt_points/n_gt_points, n_covered_gt_points, n_gt_points
+
+def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, gt_labels: torch.Tensor, pos_gt_grasp_locs: torch.Tensor, radius: float=0.005) -> pd.DataFrame:
     """Determine the success and coverage at various threshold confidence values.
 
     Args:
@@ -74,6 +81,7 @@ def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, g
         pred_grasp_locs (torch.Tensor): (N_PTS, 3) predicted contact points
         gt_labels (torch.Tensor): (N_PTS, 1) contact point labels
         pos_gt_grasp_locs (torch.Tensor): (N_GT_PTS, 3) ground truth contact points
+        radius (float): success radius for maximum distance from predicted point for a ground truth point to be "covered"
 
     Returns:
         pd.DataFrame: dataframe of confidence thresholds and their corresponding success and coverage values.
@@ -88,24 +96,34 @@ def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, g
     for t in thresholds:
         pred_classes = (confs > t).squeeze()
         pos_pred_grasp_locs = pred_grasp_locs[pred_classes == 1, :]
+
+        (
+            success, n_correctly_pred_positive, n_pred_positive
+        ) = success_from_labels(pred_classes, gt_labels)
+        (
+            _coverage, n_covered_gt_points, n_gt_points
+        ) = coverage(pos_pred_grasp_locs, pos_gt_grasp_locs, radius=radius)
         res.append({
             "confidence": t,
-            # "success": true_positive(pred_classes, gt_labels),  # precision
-            # "coverage": recall(pred_classes, gt_labels.ravel()) # recall
-            "success": success_from_labels(pred_classes, gt_labels),
-            "coverage": coverage(pos_pred_grasp_locs, pos_gt_grasp_locs)
+            "success": success,
+            "n_pred_positive": n_pred_positive,
+            "n_correctly_pred_positive": n_correctly_pred_positive,
+            "coverage": _coverage,
+            "n_covered_gt_points": n_covered_gt_points,
+            "n_gt_points": n_gt_points
         })
     
     return pd.DataFrame(res).astype(float)
 
-def framewise_sc_curve(confs, pred_grasp_locs, labels, gt_contact_pts):
-    """Make a success-coverage curve from a sequence of time series data."""
+def framewise_sc_curve(confs, pred_grasp_locs, labels, gt_contact_pts, radius=0.005):
+    """Combine success-coverage curves from a sequence of time series data."""
     curves = []
-    for t in range(len(confs)):
+    times = range(len(confs))
+    for t in times:
         curves.append(success_coverage_curve(
-            confs[t], pred_grasp_locs[t], labels[t], gt_contact_pts[t]
+            confs[t], pred_grasp_locs[t], labels[t], gt_contact_pts[t], radius=radius
         ))
-    return pd.concat(curves).groupby('confidence').mean()
+    return pd.concat(curves, keys=[f"t_{t}" for t in times])
 
 def plot_sc_curve(df, ax=None, title="Coverage vs. Success", **plot_kwargs):
     if ax is None:
@@ -125,18 +143,32 @@ def precision_recall_curve(confs: torch.Tensor, labels: torch.Tensor):
     thresholds = torch.linspace(0, 1, 1000)
     for thresh in thresholds:
         preds = confs > thresh
+        (
+            _precision, n_correctly_pred_positive, n_pred_positive
+        ) = precision(preds, labels)
+        (
+            _recall, n_correctly_pred_positive, n_actual_positive
+        ) = recall(preds, labels)
+
         curves.append({
             "confidence": thresh,
-            "precision": precision(preds, labels),
-            "recall": recall(preds, labels)
+            "precision": _precision,
+            "recall": _recall,
+            "n_correctly_pred_positive": n_correctly_pred_positive,
+            "n_pred_positive": n_pred_positive,
+            "n_actual_positive": n_actual_positive
         })
     return pd.DataFrame(curves).astype('float')
 
 def precision(pred, des):
-    return float(torch.mean((des.bool()[pred.bool()].float())))
+    n_pred_positive = pred.sum()
+    n_correctly_pred_positive = des.bool()[pred.bool()].sum()
+    return n_correctly_pred_positive/n_pred_positive, n_correctly_pred_positive, n_pred_positive
 
-def recall(pred, label):
-    return float(torch.mean(pred.bool()[label.bool()].float()))
+def recall(pred, des):
+    n_actual_positive = des.sum()
+    n_correctly_pred_positive = des.bool()[pred.bool()].sum()
+    return n_correctly_pred_positive/n_actual_positive, n_correctly_pred_positive, n_actual_positive
 
 def plot_pr_curve(df, ax=None, title="Precision-Recall Curve", **plot_kwargs):
     if ax is None:
