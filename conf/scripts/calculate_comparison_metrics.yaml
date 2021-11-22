@@ -1,0 +1,12 @@
+# @package _global_
+
+# tsgrasp_output_path: ???
+# ctn_output_path: ???
+
+tsgrasp_output_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.h5
+ctn_output_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.h5
+
+tsgrasp_csv_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.csv
+ctn_csv_path: /home/tim/Research/tsgrasp/experiments/ctn_tsgraspnet_11_17.csv
+
+png_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.png
