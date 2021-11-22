@@ -29,16 +29,17 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
         ts_results = ts_ds['outputs'][example_num]
         ctn_results = ctn_ds['outputs'][example_num]
 
+        device = torch.device('cuda') if cfg.gpus > 1 else torch.device('cpu')
         # Load relevant confidence and position information from each model
-        ts_confs = torch.sigmoid(torch.Tensor(ts_results['class_logits']))
-        ts_pos = torch.Tensor(ts_results['positions'])
-        ts_gt_contact_pts = torch.Tensor(ts_results['gt_contact_pts'])
-        ts_labels = torch.Tensor(ts_results['pt_labels'])
+        ts_confs = torch.sigmoid(torch.Tensor(ts_results['class_logits'])).to(device)
+        ts_pos = torch.Tensor(ts_results['positions']).to(device)
+        ts_gt_contact_pts = torch.Tensor(ts_results['gt_contact_pts']).to(device)
+        ts_labels = torch.Tensor(ts_results['pt_labels']).to(device)
 
-        ctn_confs = torch.sigmoid(torch.Tensor(ctn_results['class_logits']))
-        ctn_pos = torch.Tensor(ctn_results['positions'])
-        ctn_gt_contact_pts = torch.Tensor(ctn_results['gt_contact_pts'])
-        ctn_labels = torch.Tensor(ctn_results['pt_labels'])
+        ctn_confs = torch.sigmoid(torch.Tensor(ctn_results['class_logits'])).to(device)
+        ctn_pos = torch.Tensor(ctn_results['positions']).to(device)
+        ctn_gt_contact_pts = torch.Tensor(ctn_results['gt_contact_pts']).to(device)
+        ctn_labels = torch.Tensor(ctn_results['pt_labels']).to(device)
 
         ## Make success-coverage curves
         ts_curves.append(

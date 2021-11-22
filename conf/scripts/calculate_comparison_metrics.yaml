@@ -2,10 +2,14 @@
 
 # tsgrasp_output_path: ???
 # ctn_output_path: ???
-output_dir: ${hydra:runtime.cwd}/experiments
 
-tsgrasp_output_name: ??? # tsgraspnet_11_17.h5
-ctn_output_name: ??? # ctn_11_17.h5
+gpus: 1
+tsgrasp_output_name: ??? # tsgraspnet_11_17
+ctn_output_name: ??? # ctn_11_17
+# tsgrasp_output_name: tsgraspnet_11_17
+# ctn_output_name: tsgraspnet_11_17
+
+output_dir: ${hydra:runtime.cwd}/experiments
 
 tsgrasp_output_path: ${output_dir}/${tsgrasp_output_name}.h5
 ctn_output_path: ${output_dir}/${tsgrasp_output_name}.h5
