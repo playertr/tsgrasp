@@ -20,11 +20,7 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
     ctn_curves = []
     ts_pr_curves = []
     ctn_pr_curves = []
-    i = 0
     for example_num in tqdm(ts_ds['outputs']):
-        i+=1
-        if i > 10:
-            break
 
         ts_results = ts_ds['outputs'][example_num]
         ctn_results = ctn_ds['outputs'][example_num]
