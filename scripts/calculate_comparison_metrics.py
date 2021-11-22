@@ -4,7 +4,8 @@ import h5py
 import os
 from tqdm import tqdm
 import torch
-from tsgrasp.utils.metric_utils.metrics import success_coverage_curve
+from tsgrasp.utils.metric_utils.metrics import framewise_sc_curve, precision_recall_curve
+
 import pandas as pd
 
 @hydra.main(config_path="../conf", config_name="scripts/calculate_comparison_metrics")
@@ -17,7 +18,8 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
 
     ts_curves = []
     ctn_curves = []
-    sc_ctn_curves = []
+    ts_pr_curves = []
+    ctn_pr_curves = []
     i = 0
     for example_num in tqdm(ts_ds['outputs']):
         i+=1
@@ -38,6 +40,7 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
         ctn_gt_contact_pts = torch.Tensor(ctn_results['gt_contact_pts'])
         ctn_labels = torch.Tensor(ctn_results['pt_labels'])
 
+        ## Make success-coverage curves
         ts_curves.append(
             framewise_sc_curve(ts_confs, ts_pos, ts_labels, ts_gt_contact_pts)
         )
@@ -45,36 +48,57 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
             framewise_sc_curve(ctn_confs, ctn_pos, ctn_labels, ctn_gt_contact_pts)
         )
 
+        ## Make precision-recall curves
+        ts_pr_curves.append(
+            precision_recall_curve(ts_confs, ts_labels)
+        )
+        ctn_pr_curves.append(
+            precision_recall_curve(ts_confs, ts_labels)
+        )
+
+    ## Concatenate the outputs from every example
+    # Success-coverage curves
     ts_curves = pd.concat(ts_curves, keys=range(len(ts_curves)))
     ts_curve = ts_curves.groupby('confidence').mean()
 
     ctn_curves = pd.concat(ctn_curves, keys=range(len(ctn_curves)))
     ctn_curve = ctn_curves.groupby('confidence').mean()
 
-    ts_curves.to_csv(cfg.tsgrasp_csv_path)
-    ctn_curves.to_csv(cfg.ctn_csv_path)
+    # Precision-recall curves
+    ts_pr_curves = pd.concat(ts_pr_curves, keys=range(len(ts_pr_curves)))
+    ts_pr_curve = ts_pr_curves.groupby('confidence').mean()
 
-    from tsgrasp.utils.metric_utils.metrics import plot_s_c_curve
+    ctn_pr_curves = pd.concat(ctn_pr_curves, keys=range(len(ctn_pr_curves)))
+    ctn_pr_curve = ctn_pr_curves.groupby('confidence').mean()
+
+    ## Write dataframes to disk
+    # Success-coverage curves
+    ts_curves.to_csv(cfg.tsgrasp_sc_csv_path)
+    ctn_curves.to_csv(cfg.ctn_sc_csv_path)
+
+    # Precision-recall curves
+    ts_pr_curves.to_csv(cfg.tsgrasp_pr_csv_path)
+    ctn_curves.to_csv(cfg.ctn_pr_csv_path)
+
+    ## Plot curves
+    from tsgrasp.utils.metric_utils.metrics import plot_sc_curve, plot_pr_curve
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots()
 
-    plot_s_c_curve(ts_curve, ax=ax, label='tsgraspnet')
-    plot_s_c_curve(ctn_curve, ax=ax, label='CTN')
+    # Success-coverage curves
+    fig, ax = plt.subplots()
+    plot_sc_curve(ts_curve, ax=ax, label='tsgraspnet')
+    plot_sc_curve(ctn_curve, ax=ax, label='CTN')
+    fig.legend()
+    plt.savefig(cfg.sc_png_path)
+
+    # Precision-recall curves
+    fig, ax = plt.subplots()
+    plot_pr_curve(ts_pr_curve, ax=ax, label='tsgraspnet')
+    plot_pr_curve(ctn_pr_curve, ax=ax, label='CTN')
     fig.legend()
 
-    plt.savefig(cfg.png_path)
+    plt.savefig(cfg.pr_png_path)
 
-def framewise_sc_curve(confs, pred_grasp_locs, labels, gt_contact_pts):
-    """Make a success-coverage curve from a sequence of time series data."""
-    curves = []
-    for t in range(len(confs)):
-        curves.append(success_coverage_curve(
-            confs[t], pred_grasp_locs[t], labels[t], gt_contact_pts[t]
-        ))
-    return pd.concat(curves).groupby('confidence').mean()
-    
-
-    
 
 if __name__ == "__main__":
     main()

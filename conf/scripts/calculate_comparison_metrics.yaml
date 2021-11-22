@@ -2,11 +2,18 @@
 
 # tsgrasp_output_path: ???
 # ctn_output_path: ???
+output_dir: ${hydra:runtime.pwd}/experiments
 
-tsgrasp_output_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.h5
-ctn_output_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.h5
+tsgrasp_output_name: ??? # tsgraspnet_11_17.h5
+ctn_output_name: ??? # ctn_11_17.h5
 
-tsgrasp_csv_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.csv
-ctn_csv_path: /home/tim/Research/tsgrasp/experiments/ctn_tsgraspnet_11_17.csv
+tsgrasp_output_path: ${output_dir}/${tsgrasp_output_name}.h5
+ctn_output_path: ${output_dir}/${tsgrasp_output_name}.h5
 
-png_path: /home/tim/Research/tsgrasp/experiments/tsgraspnet_11_17.png
+tsgrasp_sc_csv_path: ${output_dir}/${tsgrasp_output_name}_sc.csv
+ctn_sc_csv_path: ${output_dir}/ctn_${ctn_output_name}_sc.csv
+tsgrasp_pr_csv_path: ${output_dir}/${tsgrasp_output_name}_pr.csv
+ctn_pr_csv_path: ${output_dir}/ctn_${ctn_output_name}_pr.csv
+
+sc_png_path: ${output_dir}/${tsgrasp_output_name}_sc.png
+pr_png_path: ${output_dir}/${tsgrasp_output_name}_pr.png
