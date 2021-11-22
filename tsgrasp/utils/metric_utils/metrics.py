@@ -42,7 +42,7 @@ class SCCurve(Callback):
                 name = "tsgraspnet"
                 curve.to_csv(f"compare/{name}_{b}_{t}.csv")
 
-                plot = plot_s_c_curve(curve, ax=ax)
+                plot = plot_sc_curve(curve, ax=ax)
                 plt.pause(0.001)
 
 
@@ -97,14 +97,16 @@ def success_coverage_curve(confs: torch.Tensor, pred_grasp_locs: torch.Tensor, g
     
     return pd.DataFrame(res).astype(float)
 
+def framewise_sc_curve(confs, pred_grasp_locs, labels, gt_contact_pts):
+    """Make a success-coverage curve from a sequence of time series data."""
+    curves = []
+    for t in range(len(confs)):
+        curves.append(success_coverage_curve(
+            confs[t], pred_grasp_locs[t], labels[t], gt_contact_pts[t]
+        ))
+    return pd.concat(curves).groupby('confidence').mean()
 
-def true_positive(pred, des):
-    return float(torch.mean((des.bool()[pred.bool()].float())))
-
-def recall(pred, label):
-    return float(torch.mean(pred.bool()[label.bool()].float()))
-
-def plot_s_c_curve(df, ax=None, title="Coverage vs. Success", **plot_kwargs):
+def plot_sc_curve(df, ax=None, title="Coverage vs. Success", **plot_kwargs):
     if ax is None:
         fig, ax = plt.subplots()
     
@@ -113,6 +115,37 @@ def plot_s_c_curve(df, ax=None, title="Coverage vs. Success", **plot_kwargs):
     ax.set_ylim([0, 1])
     ax.set_xlabel("Coverage")
     ax.set_ylabel("Success")
+    ax.set_title(title)
+
+    return plot
+
+def precision_recall_curve(confs: torch.Tensor, labels: torch.Tensor):
+    curves = []
+    thresholds = torch.linspace(0, 1, 1000)
+    for thresh in thresholds:
+        preds = confs > thresh
+        curves.append({
+            "confidence": thresh,
+            "precision": precision(preds, labels),
+            "recall": recall(preds, labels)
+        })
+    return pd.DataFrame(curves).astype('float')
+
+def precision(pred, des):
+    return float(torch.mean((des.bool()[pred.bool()].float())))
+
+def recall(pred, label):
+    return float(torch.mean(pred.bool()[label.bool()].float()))
+
+def plot_pr_curve(df, ax=None, title="Precision-Recall Curve", **plot_kwargs):
+    if ax is None:
+        fig, ax = plt.subplots()
+    
+    plot = ax.plot(df['recall'], df['precision'], **plot_kwargs)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
     ax.set_title(title)
 
     return plot
