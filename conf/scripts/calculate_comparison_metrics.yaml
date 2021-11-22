@@ -2,7 +2,7 @@
 
 # tsgrasp_output_path: ???
 # ctn_output_path: ???
-output_dir: ${hydra:runtime.pwd}/experiments
+output_dir: ${hydra:runtime.cwd}/experiments
 
 tsgrasp_output_name: ??? # tsgraspnet_11_17.h5
 ctn_output_name: ??? # ctn_11_17.h5
