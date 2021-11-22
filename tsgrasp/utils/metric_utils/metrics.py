@@ -57,6 +57,7 @@ def coverage(pos_pred_grasp_locs, pos_gt_grasp_locs, radius=0.005):
     
     (gt close to predicted) / (total gt)
     """
+    if pos_gt_grasp_locs.shape[0] == 0: return torch.Tensor([0.0])
     if pos_pred_grasp_locs.shape[0] == 0: return torch.Tensor([0.0])
 
     # for each grasp coordinate in gt_grasps, find the distance to every grasp grasp_coordinate in pred_grasps
