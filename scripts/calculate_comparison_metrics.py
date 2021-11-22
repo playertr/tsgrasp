@@ -29,7 +29,7 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
         ts_results = ts_ds['outputs'][example_num]
         ctn_results = ctn_ds['outputs'][example_num]
 
-        device = torch.device('cuda') if cfg.gpus > 1 else torch.device('cpu')
+        device = torch.device('cuda') if cfg.gpus > 0 else torch.device('cpu')
         # Load relevant confidence and position information from each model
         ts_confs = torch.sigmoid(torch.Tensor(ts_results['class_logits'])).to(device)
         ts_pos = torch.Tensor(ts_results['positions']).to(device)
