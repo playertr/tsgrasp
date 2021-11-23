@@ -64,7 +64,7 @@ def coverage(pos_pred_grasp_locs, pos_gt_grasp_locs, radius=0.005):
     if pos_pred_grasp_locs.shape[0] == 0: return torch.Tensor([0.0]), 0, n_gt_points
 
     # for each grasp coordinate in gt_grasps, find the distance to every grasp grasp_coordinate in pred_grasps
-    dists = torch.cdist(pos_gt_grasp_locs, pos_pred_grasp_locs) # (n_gt, n_pred)
+    dists = torch.cdist(pos_gt_grasp_locs, pos_pred_grasp_locs, compute_mode="donot_use_mm_for_euclid_dist") # (n_gt, n_pred)
 
     closest_dists, idxs = dists.min(axis=1)
 
