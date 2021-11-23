@@ -3,7 +3,7 @@ import wandb
 import hydra
 import os
 
-@hydra.main(config_path="../conf", config_name="download_model")
+@hydra.main(config_path="../conf", config_name="scripts/download_model")
 def main(cfg):
     api = wandb.Api()
     artifact = api.artifact(cfg.artifact_name, type='model')
