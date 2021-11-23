@@ -12,7 +12,7 @@ checkpoint: ctn_11_17/model.ckpt # relative path to .ckpt from ckpts
 data:
   data_cfg:
     points_per_frame: 20000
-    dataroot: /home/tim/Research/tsgrasp/data/acronymvid
+    dataroot: ${hydra:runtime.cwd}/data/acronymvid
 
 training:
   gpus: 0
