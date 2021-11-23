@@ -47,9 +47,9 @@ class Trainer:
             LearningRateMonitor(logging_interval='step'),
         ]
 
-        if cfg.training.save_animations:
+        if cfg.training.animate_outputs:
             from tsgrasp.utils.viz.viz import GraspAnimationLogger
-            _callbacks.append(GraspAnimationLogger(example_batch))
+            _callbacks.append(GraspAnimationLogger(cfg.training.viz, example_batch))
 
         if cfg.training.make_sc_curve:
             from tsgrasp.utils.metric_utils.metrics import SCCurve
