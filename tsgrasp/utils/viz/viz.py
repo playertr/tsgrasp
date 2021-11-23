@@ -1,22 +1,26 @@
+
+LOCAL_INTERACTIVE_DEBUG = False
+if not LOCAL_INTERACTIVE_DEBUG:
+    import pyglet
+    pyglet.options['headless'] = True
+
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
-
-import pyglet
-pyglet.options['headless'] = True
 
 import trimesh
 from PIL import Image
 import io
 import numpy as np
 from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
-import MinkowskiEngine as ME
 import imageio
 import os
 
 class GraspAnimationLogger(Callback):
-    def __init__(self, example_batch: dict):
+    def __init__(self, cfg, example_batch: dict):
         super().__init__()
+        self.save_outputs=cfg.save_outputs
+        self.output_dir=cfg.output_dir
         self.batch = example_batch
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
@@ -38,7 +42,11 @@ class GraspAnimationLogger(Callback):
         ## Run forward inference on this batch
         pts = batch['positions'].to(pl_module.device)
         outputs = pl_module.forward(pts)
-        animate_grasps_from_outputs(outputs, name=f"11_17_kern5/{batch_idx}")
+
+        os.makedirs(self.output_dir, exist_ok=True)
+        animate_grasps_from_outputs(outputs,
+            name=os.path.join(self.output_dir, str(batch_idx))
+        )
 
 def animate_grasps_from_outputs(outputs, name=""):
     """
@@ -66,14 +74,13 @@ def animate_grasps_from_outputs(outputs, name=""):
     ## Construct the 4x4 grasp poses
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
 
-    os.makedirs('figs', exist_ok=True)
     gif_paths = []
     for batch_dim in range(len(pts)):
         ims = animate_grasps(
             pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), 
             confs[batch_dim].cpu().numpy()
         )
-        path = f"figs/{name}_{batch_dim}.gif"
+        path = f"{name}_{batch_dim}.gif"
         imageio.mimsave(path, ims)
         gif_paths.append(path)
         
@@ -128,7 +135,7 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
         )
     )
     scene.camera_transform = cam_pose
-    # scene.show(viewer='gl')
+    if LOCAL_INTERACTIVE_DEBUG: scene.show(viewer='gl')
     data = scene.save_image(resolution=res, visible=False) 
     im = Image.open(io.BytesIO(data))
     return np.asarray(im)
