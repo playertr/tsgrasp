@@ -6,7 +6,7 @@ _target_: tsgrasp.data.lit_acronymvid.LitAcronymvidDataset
 data_cfg:
   # dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
   dataroot: /home/tim/Research/tsgrasp/data/acronymvid
-  points_per_frame: 90000
+  points_per_frame: 45000
   num_workers: 4
 
   time_decimation_factor: 3
