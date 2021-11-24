@@ -8,6 +8,7 @@ optimizer:
 # resume_from_checkpoint: "/home/tim/Research/tsgrasp/outputs/2021-09-17/11-32-05/default/0/checkpoints/epoch=1-step=31.ckpt"
 
 animate_outputs: False
+make_sc_curve: False
 
 use_wandb: False
 wandb:
