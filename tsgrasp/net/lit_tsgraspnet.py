@@ -136,10 +136,6 @@ class LitTSGraspNet(pl.LightningModule):
 
             pred = class_logits[b] > 0
             label = pt_labels_b
-            print(f"Predicted grasps: \t{pred.sum()}")
-            print(f"Actual grasps: \t{label.sum()}")
-            print(f"Precision: \t{true_positive(pred, label)}")
-            print(f"Recall: \t{recall(pred, label)}")
 
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
