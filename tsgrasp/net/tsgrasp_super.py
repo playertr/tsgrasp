@@ -20,8 +20,11 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
 
         Returns:
             min_dists (torch.Tensor): (..., V, 1) 
+            min_idc (torch.Tensor): the corresponding indices of the closest points
         """
-        dists = torch.cdist(xyz, contact_points, p=2) # (V, W)
+        dists = torch.cdist(xyz, contact_points, p=2, 
+            compute_mode="donot_use_mm_for_euclid_dist"
+        ) # (V, W)
         min_dists, min_idcs = torch.min(dists, dim=-1)
         return min_dists, min_idcs 
 
