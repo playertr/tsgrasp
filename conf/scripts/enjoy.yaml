@@ -2,12 +2,12 @@
 
 defaults:
   - /training: default
-  - /model: temporal_ctn
+  - /model: tsgraspnet
   - /data: acronymvid
   - _self_
 
 ## Enjoy setup
-checkpoint: ctn_11_17/model.ckpt # relative path to .ckpt from ckpts
+checkpoint: tsgraspnet_11_17_kern5/model.ckpt # relative path to .ckpt from ckpts
 
 data:
   data_cfg:
@@ -15,7 +15,7 @@ data:
     dataroot: ${hydra:runtime.cwd}/data/acronymvid
 
 training:
-  gpus: 0
+  gpus: 1
   batch_size: 1
   animate_outputs: True
   viz:
