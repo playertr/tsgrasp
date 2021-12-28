@@ -107,6 +107,7 @@ class ContactTorchNet(TSGraspSuper):
             # Head for grasp direction -- normalization done in forward()
             self.baseline_dir_head = nn.Sequential(
                 nn.Conv1d(128, 128, 1),
+                nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 3, 1)
@@ -115,6 +116,7 @@ class ContactTorchNet(TSGraspSuper):
             # Head for grasp approach -- G-S orthonormalization done in forward()
             self.approach_dir_head = nn.Sequential(
                 nn.Conv1d(128, 128, 1),
+                nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 3, 1)
@@ -134,6 +136,7 @@ class ContactTorchNet(TSGraspSuper):
             #     raise NotImplementedError("Only binned grasp offsets are implemented.")
             self.grasp_offset_head = nn.Sequential(
                 nn.Conv1d(128, 128, 1),
+                nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 1, 1)
@@ -142,6 +145,7 @@ class ContactTorchNet(TSGraspSuper):
             # Head for contact points
             self.binary_seg_head = nn.Sequential(
                 nn.Conv1d(128, 128, 1),
+                nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.5),
                 nn.Conv1d(128, 1, 1)
