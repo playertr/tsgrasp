@@ -5,7 +5,7 @@ from omegaconf import DictConfig
 import os
 import torch
 
-from tsgrasp.data.acronymvid import AcronymVidDataset, minkowski_collate_fn
+from tsgrasp.data.acronymvid import AcronymVidDataset, ragged_collate_fn
 
 class LitAcronymvidDataset(pl.LightningDataModule):
     def __init__(self, data_cfg : DictConfig, batch_size):
@@ -23,19 +23,20 @@ class LitAcronymvidDataset(pl.LightningDataModule):
         return DataLoader(self.dataset_train, 
         batch_size=self.batch_size, 
         num_workers=self.num_workers, 
-        collate_fn=minkowski_collate_fn,  shuffle=True,
-        # sampler=RandomSampler(self.dataset_train, int(len(self.dataset_train) / self.data_cfg.subset_factor))
+        collate_fn=ragged_collate_fn, persistent_workers=True,
+        sampler=RandomSampler(self.dataset_train, 
+            num_samples=int(len(self.dataset_train)*self.data_cfg.data_proportion_per_epoch))
         )
 
     def val_dataloader(self):
-        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn,  
-        # sampler=RandomSampler(self.dataset_val, int(len(self.dataset_val) / self.data_cfg.subset_factor))
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=ragged_collate_fn,
+        sampler=RandomSampler(self.dataset_val, 
+            num_samples=min(100, int(len(self.dataset_val)*self.data_cfg.data_proportion_per_epoch)))
         )
 
     def test_dataloader(self):
         # TODO: DON'T USE VAL DATASET FOR TESTING!
-        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=minkowski_collate_fn, 
-        # sampler=RandomSampler(self.dataset_val, int(len(self.dataset_val) / self.data_cfg.subset_factor))
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=ragged_collate_fn
         )
 
     def prepare_data(self):
@@ -44,28 +45,27 @@ class LitAcronymvidDataset(pl.LightningDataModule):
             raise FileNotFoundError(f"Dataroot <{self.data_cfg.dataroot}> not populated with data files. Download or generate dataset.")
 
 # https://discuss.pytorch.org/t/new-subset-every-epoch/85018
-# class RandomSampler(torch.utils.data.Sampler):
-#     def __init__(self, data_source, num_samples=None):
-#         self.data_source = data_source
-#         self._num_samples = num_samples
+class RandomSampler(torch.utils.data.Sampler):
+    def __init__(self, data_source, num_samples=None):
+        self.data_source = data_source
+        self._num_samples = num_samples
 
-#         if not isinstance(self.num_samples, int) or self.num_samples <= 0:
-#             raise ValueError(
-#                 "num_samples should be a positive integer "
-#                 "value, but got num_samples={}".format(self.num_samples)
-#             )
+        if not isinstance(self.num_samples, int) or self.num_samples <= 0:
+            raise ValueError(
+                "num_samples should be a positive integer "
+                "value, but got num_samples={}".format(self.num_samples)
+            )
 
-#     @property
-#     def num_samples(self):
-#         # dataset size might change at runtime
-#         if self._num_samples is None:
-#             return len(self.data_source)
-#         return self._num_samples
+    @property
+    def num_samples(self):
+        # dataset size might change at runtime
+        if self._num_samples is None:
+            return len(self.data_source)
+        return self._num_samples
 
-#     def __iter__(self):
-#         n = len(self.data_source)
-#         return iter(torch.randperm(n, dtype=torch.int64)[: self.num_samples].tolist())
+    def __iter__(self):
+        n = len(self.data_source)
+        return iter(torch.randperm(n, dtype=torch.int64)[: self.num_samples].tolist())
 
-#     def __len__(self):
-#         return self.num_samples
-
+    def __len__(self):
+        return self.num_samples

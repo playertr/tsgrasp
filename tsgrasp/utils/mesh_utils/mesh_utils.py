@@ -164,11 +164,7 @@ class PandaGripper(object):
             control_points[1:3, 2] = 0.0584
         control_points = np.tile(np.expand_dims(control_points, 0), [batch_size, 1, 1])
 
-        # if use_tf:
-        #     return tf.convert_to_tensor(control_points)
-
         return control_points
-
 
 def create_gripper(name, configuration=None, root_folder=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))):
     """Create a gripper object.

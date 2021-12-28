@@ -31,6 +31,7 @@ class Trainer:
                     config=OmegaConf.to_container(cfg, resolve=True),
                     notes=cfg.training.wandb.notes
                 )
+                wandb.run.log_code(".")
                 wandb_logger = loggers.WandbLogger(
                     project=cfg.training.wandb.project, 
                     log_model="all", 
@@ -46,9 +47,13 @@ class Trainer:
             LearningRateMonitor(logging_interval='step'),
         ]
 
-        if cfg.training.save_animations:
+        if cfg.training.animate_outputs:
             from tsgrasp.utils.viz.viz import GraspAnimationLogger
-            _callbacks.append(GraspAnimationLogger(example_batch))
+            _callbacks.append(GraspAnimationLogger(cfg.training.viz, example_batch))
+
+        if cfg.training.make_sc_curve:
+            from tsgrasp.utils.metric_utils.metrics import SCCurve
+            _callbacks.append(SCCurve())
 
         ## Lightning Trainer
         if "resume_from_checkpoint" in cfg.training:

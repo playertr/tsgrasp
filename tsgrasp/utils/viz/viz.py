@@ -1,47 +1,54 @@
+
+LOCAL_INTERACTIVE_DEBUG = False
+if not LOCAL_INTERACTIVE_DEBUG:
+    import pyglet
+    pyglet.options['headless'] = True
+
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import Callback, base
+from pytorch_lightning.callbacks import Callback
 
-from pyglet import gl
 import trimesh
 from PIL import Image
 import io
 import numpy as np
 from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
-import MinkowskiEngine as ME
 import imageio
 import os
-import wandb
 
 class GraspAnimationLogger(Callback):
-    def __init__(self, example_batch: dict):
+    def __init__(self, cfg, example_batch: dict):
         super().__init__()
+        self.save_outputs=cfg.save_outputs
+        self.output_dir=cfg.output_dir
         self.batch = example_batch
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
 
         ## Run forward inference on the example batch
-        stensor = ME.SparseTensor(
-            coordinates = self.batch['coordinates'].to(pl_module.device),
-            features = self.batch['features'].to(pl_module.device))
-        outputs = pl_module.model.forward(stensor)
         pts = self.batch['positions'].to(pl_module.device)
+        outputs = pl_module.forward(pts)
 
-        gif_paths = animate_grasps_from_outputs(outputs, pts)
+        gif_paths = animate_grasps_from_outputs(outputs)
 
         ## Send to C L O U D
-        wandb.log({
-            "val/examples": [wandb.Image(path) 
-                              for path in gif_paths]
-            })
+        # wandb.log({
+        #     "val/examples": [wandb.Image(path) 
+        #                       for path in gif_paths]
+        #     })
 
-    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_test_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
+
+        ## Run forward inference on this batch
         pts = batch['positions'].to(pl_module.device)
-        outputs = [item.to(pl_module.device) for item in outputs['outputs']]
-        animate_grasps_from_outputs(outputs, pts, name=f"new_batch_{batch_idx}")
+        outputs = pl_module.forward(pts)
 
+        os.makedirs(self.output_dir, exist_ok=True)
+        animate_grasps_from_outputs(outputs,
+            name=os.path.join(self.output_dir, str(batch_idx))
+        )
 
-def animate_grasps_from_outputs(outputs, pts, name=""):
+def animate_grasps_from_outputs(outputs, name=""):
     """
     Save GIFs overlaying the predicted grasps on the points clouds.
     Returns a list of CPU tensor animations.
@@ -49,36 +56,31 @@ def animate_grasps_from_outputs(outputs, pts, name=""):
     outputs: raw grasp parameters from module. (N_BATCH*N_TIME*N_PT, W_i)
     pts: point cloud. (N_BATCH, N_TIME, N_PT, 3)
     """
-    ## Package each grasp parameter P into a regular, dense Tensor of shape
-    # (BATCH, TIME, N_PRED_GRASP, *P.shape)
-    class_logits, baseline_dir, approach_dir, grasp_offset = outputs
-    n_batch = pts.shape[0]
-    n_time = pts.shape[1]
-    class_logits = class_logits.view(n_batch, n_time, -1, 1)
-    approach_dir = approach_dir.view(n_batch, n_time, -1, 3)
-    baseline_dir = baseline_dir.view(n_batch, n_time, -1, 3)
-    grasp_offset = grasp_offset.view(n_batch, n_time, -1, 1)
 
-    ## Select the top 50 most likely grasps from each time step, for each 
-    # batch.
+    class_logits, baseline_dir, approach_dir, grasp_offset, pts = outputs
+
+    contact_pts = pts
+    # ## Select the top 50 most likely grasps from each time step, for each 
+    # # batch.
     confs = torch.sigmoid(class_logits)
-    _, idxs = torch.topk(confs, k=100, dim=2)
-    contact_pts = torch.gather(pts, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    baseline_dir = torch.gather(baseline_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    approach_dir = torch.gather(approach_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
-    grasp_offset = torch.gather(grasp_offset, dim=2, index=idxs)
+    # _, idxs = torch.topk(confs, k=100, dim=2)
+
+    # contact_pts = torch.gather(pts, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # baseline_dir = torch.gather(baseline_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # approach_dir = torch.gather(approach_dir, dim=2, index=idxs.repeat(1, 1, 1, 3))
+    # grasp_offset = torch.gather(grasp_offset, dim=2, index=idxs)
+
 
     ## Construct the 4x4 grasp poses
     grasp_tfs = build_6dof_grasps(contact_pts, baseline_dir, approach_dir, grasp_offset)
 
-    os.makedirs('figs', exist_ok=True)
     gif_paths = []
     for batch_dim in range(len(pts)):
         ims = animate_grasps(
             pts[batch_dim].cpu().numpy(), grasp_tfs[batch_dim].cpu().numpy(), 
             confs[batch_dim].cpu().numpy()
         )
-        path = f"figs/{name}_{batch_dim}.gif"
+        path = f"{name}_{batch_dim}.gif"
         imageio.mimsave(path, ims)
         gif_paths.append(path)
         
@@ -114,6 +116,8 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
     pitch: pitch angle of new camera perspective. 0.55*2*np.pi works well.
     """
 
+    grasp_tfs = [grasp_tfs[i] for i in range(len(grasp_tfs)) if confs[i] > 0.5]
+
     pcl = trimesh.points.PointCloud(vertices=pts, r=100)
     pcl.visual.vertex_colors = trimesh.visual.interpolate(confs, color_map='viridis') # or color by depth: pts[:,2]
 
@@ -131,9 +135,8 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
         )
     )
     scene.camera_transform = cam_pose
-
-    window_conf = gl.Config(double_buffer=True, depth_size=24) 
-    data = scene.save_image(resolution=res, window_conf=window_conf, visible=False) 
+    if LOCAL_INTERACTIVE_DEBUG: scene.show(viewer='gl')
+    data = scene.save_image(resolution=res, visible=False) 
     im = Image.open(io.BytesIO(data))
     return np.asarray(im)
 

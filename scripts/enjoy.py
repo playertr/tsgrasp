@@ -1,27 +1,18 @@
-## Load model
-import wandb
-api = wandb.Api()
-artifact = api.artifact('playertr/TSGrasp/model-oq9t9qwj:v65', type='model')
-artifact_dir = artifact.download(root='ckpts/45000_1')
+import hydra
+import torch
 
-## Load config
-# TODO: use same config from wandb run
-from hydra import compose, initialize
-from omegaconf import open_dict
+@hydra.main(config_path="../conf", config_name="scripts/enjoy")
+def main(cfg):
 
-with initialize(config_path="../conf"):
-    cfg = compose(config_name="config")
+    ## Create Trainer
+    from tsgrasp.training.trainer import Trainer
+    trainer = Trainer(cfg)
 
-## Override config items to match wandb run
-cfg.data.data_cfg.points_per_frame = 45000
-cfg.training.batch_size=1
-ckpt = '/home/tim/Research/tsgrasp/ckpts/45000_1/model.ckpt'
-with open_dict(cfg):
-    cfg.training.resume_from_checkpoint=ckpt
+    trainer.pl_model.load_state_dict(torch.load(cfg.training.resume_from_checkpoint)['state_dict'])
 
-## Create Trainer
-from tsgrasp.training.trainer import Trainer
-trainer = Trainer(cfg)
-trainer.pl_model = trainer.pl_model.load_from_checkpoint(ckpt)
+    # trainer.train()
+    trainer.test()
 
-trainer.test()
+
+if __name__ == "__main__":
+    main()
