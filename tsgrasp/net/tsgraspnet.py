@@ -23,26 +23,33 @@ class TSGraspNet(TSGraspSuper):
             cfg.backbone_model_name, cfg.feature_dimension, cfg.backbone_out_dim, D=cfg.D, conv1_kernel_size=cfg.conv1_kernel_size,
             dilations=cfg.dilations
         )
-        self.classification_head = nn.Sequential(
-            nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
-            nn.Dropout(p=0.3),
-            nn.Conv1d(in_channels=128, out_channels=1, kernel_size=1),
+        self.binary_seg_head = nn.Sequential(
+                nn.Conv1d(cfg.backbone_out_dim, 128, 1),
+                nn.ReLU(),
+                nn.BatchNorm1d(128),
+                nn.Dropout(p=0.5),
+                nn.Conv1d(128, 1, 1)
         )
         self.baseline_dir_head = nn.Sequential(
-            nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
-            nn.Dropout(p=0.3),
-            nn.Conv1d(in_channels=128, out_channels=3, kernel_size=1),
+                nn.Conv1d(cfg.backbone_out_dim, 128, 1),
+                nn.ReLU(),
+                nn.BatchNorm1d(128),
+                nn.Dropout(p=0.3),
+                nn.Conv1d(128, 3, 1)
         )
         self.approach_dir_head = nn.Sequential(
-            nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
-            nn.Dropout(p=0.3),
-            nn.Conv1d(in_channels=128, out_channels=3, kernel_size=1),
+                nn.Conv1d(cfg.backbone_out_dim, 128, 1),
+                nn.ReLU(),
+                nn.BatchNorm1d(128),
+                nn.Dropout(p=0.3),
+                nn.Conv1d(128, 3, 1)
         )
-
         self.grasp_offset_head = nn.Sequential(
-            nn.Conv1d(in_channels=cfg.backbone_out_dim, out_channels=128, kernel_size=1),
-            nn.Dropout(p=0.3),
-            nn.Conv1d(in_channels=128, out_channels=1, kernel_size=1),
+                nn.Conv1d(cfg.backbone_out_dim, 128, 1),
+                nn.ReLU(),
+                nn.BatchNorm1d(128),
+                nn.Dropout(p=0.3),
+                nn.Conv1d(128, 1, 1)
         )
 
     def forward(self, sparse_x):
@@ -56,7 +63,7 @@ class TSGraspNet(TSGraspSuper):
         x = x.slice(sparse_x).F
         torch.cuda.empty_cache()
 
-        class_logits = self.classification_head(x.unsqueeze(-1)).squeeze(dim=-1)
+        class_logits = self.binary_seg_head(x.unsqueeze(-1)).squeeze(dim=-1)
 
         # Gram-Schmidt normalization
         baseline_dir = self.baseline_dir_head(x.unsqueeze(-1)).squeeze()
