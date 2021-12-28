@@ -134,9 +134,6 @@ class LitTSGraspNet(pl.LightningModule):
                 width_labels_b
             )
 
-            pred = class_logits[b] > 0
-            label = pt_labels_b
-
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
