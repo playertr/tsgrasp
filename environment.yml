@@ -6,6 +6,7 @@ channels:
   - anaconda
   - defaults
 dependencies:
+  - anaconda::openblas-devel
   - _libgcc_mutex=0.1
   - _openmp_mutex=4.5
   - blas=2.16
