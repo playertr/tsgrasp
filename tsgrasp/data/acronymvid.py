@@ -51,31 +51,31 @@ class AcronymVidDataset(torch.utils.data.Dataset):
             # `depth` contains the depth video values, and `labels` is a binary mask indicating
             # whether a given pixel's 3D point is within data_generation.params.EPSILON of a positive grasp contact.
             depth = np.asarray(ds[traj_name]["depth"])
-            labels = np.asarray(ds[traj_name]["grasp_labels"])
-            nearest_grasp_idx = np.asarray(ds[traj_name]["nearest_grasp_idx"])
             success = np.asarray(ds["grasps/qualities/flex/object_in_gripper"])
-            pos_grasp_tfs = np.asarray(ds["grasps/transforms"])[success==1]
+            grasp_tfs = np.asarray(ds["grasps/transforms"])
             tfs_from_cam_to_obj = np.asarray(ds[traj_name]["tf_from_cam_to_obj"])
             grasp_contact_points = np.asarray(ds["grasps/contact_points"])
+            # unused qantities
+            # labels = np.asarray(ds[traj_name]["grasp_labels"])
+            # nearest_grasp_idx = np.asarray(ds[traj_name]["nearest_grasp_idx"])
 
         ## Make data shorter via temporal decimation
         depth = depth[::self.time_decimation_factor, :, :]
-        labels = labels[::self.time_decimation_factor, :, :]
         tfs_from_cam_to_obj = tfs_from_cam_to_obj[::self.time_decimation_factor,:,:]
-        nearest_grasp_idx = nearest_grasp_idx[::self.time_decimation_factor,:,:]
 
-        pcs = [depth_to_pointcloud(d) for d in depth]
-        orig_pcs = torch.Tensor(pcs)
-        labels = [label_frame for label_frame in labels]
-        nearest_grasp_idx = [idcs for idcs in nearest_grasp_idx]
+        ## Remove all grasps with nan contact points
+        invalid_idxs = np.isnan(grasp_contact_points).any(axis=(1,2))
+        pos_grasp_tfs = grasp_tfs[success==1 & ~invalid_idxs]
+        success = success[~invalid_idxs]
+        grasp_contact_points = grasp_contact_points[~invalid_idxs]
 
         ## Downsample points
+        pcs = [depth_to_pointcloud(d) for d in depth]
+        # orig_pcs = torch.Tensor(pcs)
         for i in range(len(pcs)):
             idxs = torch.randperm(len(pcs[i]), dtype=torch.int32, device='cpu')[:self.pts_per_frame].sort()[0].long()
             
             pcs[i] = pcs[i][idxs]
-            labels[i] = labels[i].ravel()[idxs]
-            nearest_grasp_idx[i] = nearest_grasp_idx[i].ravel()[idxs]
 
         ## Quantize points to grid
         positions = torch.Tensor(pcs) # save positions prior to truncation
