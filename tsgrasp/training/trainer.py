@@ -65,7 +65,8 @@ class Trainer:
 
         # if True:
         #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
-
+        from pytorch_lightning.profiler import PyTorchProfiler
+        profiler = PyTorchProfiler(filename="tsgrasp.prof")
         self.trainer = pl.Trainer(
             gpus=cfg.training.gpus,
             logger=_loggers,
@@ -73,7 +74,7 @@ class Trainer:
             callbacks=_callbacks,
             max_epochs=cfg.training.max_epochs,
             resume_from_checkpoint=ckpt,
-            profiler='pytorch',
+            profiler=profiler,
             **kwargs
         )
 
