@@ -129,11 +129,11 @@ class LitTSGraspNet(pl.LightningModule):
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
 
-            pt_preds.append((class_logits[b] > 0).detach().cpu().ravel())
-            pt_labels.append(pt_labels_b.detach().cpu().ravel())
-            add_s_losses.append(add_s_loss_b.detach().cpu())
-            width_losses.append(width_loss_b.detach().cpu())
-            class_losses.append(class_loss_b.detach().cpu())
+            pt_preds.append((class_logits[b] > 0).detach().ravel())
+            pt_labels.append(pt_labels_b.detach().ravel())
+            add_s_losses.append(add_s_loss_b.detach())
+            width_losses.append(width_loss_b.detach())
+            class_losses.append(class_loss_b.detach())
 
         ## Combine loss components
         loss = 0.0
