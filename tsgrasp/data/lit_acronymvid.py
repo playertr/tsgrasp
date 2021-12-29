@@ -24,12 +24,14 @@ class LitAcronymvidDataset(pl.LightningDataModule):
         batch_size=self.batch_size, 
         num_workers=self.num_workers, 
         collate_fn=ragged_collate_fn, persistent_workers=True,
+        pin_memory=True
         # sampler=RandomSampler(self.dataset_train, 
         #     num_samples=int(len(self.dataset_train)*self.data_cfg.data_proportion_per_epoch))
         )
 
     def val_dataloader(self):
-        return DataLoader(self.dataset_val, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=ragged_collate_fn,
+        return DataLoader(self.dataset_val, batch_size=self.batch_size, 
+            num_workers=self.num_workers, collate_fn=ragged_collate_fn, pin_memory=True
         # sampler=RandomSampler(self.dataset_val, 
         #     num_samples=min(100, int(len(self.dataset_val)*self.data_cfg.data_proportion_per_epoch)))
         )
