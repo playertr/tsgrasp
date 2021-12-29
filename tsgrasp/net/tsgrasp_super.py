@@ -75,7 +75,8 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         offset_label_nan = width_labels.ravel().isnan()
         width_labels = torch.nan_to_num(width_labels)
         width_mse = (width_preds.ravel() - width_labels.ravel())**2
-        width_mse = width_mse[pt_labels.bool().ravel() & ~offset_label_nan]
+        with torch.inference_mode():
+            width_mse = width_mse[pt_labels.bool().ravel() & ~offset_label_nan]
         width_loss = torch.mean(width_mse) if len(width_mse > 0) else torch.zeros(1, device=width_preds.device).squeeze()
 
         return width_loss
@@ -295,10 +296,11 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         ## Width labels
         # the minimum index could belong to a right-finger gripper point
         width_labels = grasp_widths.repeat(1, 2, 1)
-        width_labels = width_labels[
-            torch.arange(T).repeat_interleave(N_PTS), 
-            min_idcs.ravel()
-        ].reshape(T, N_PTS, 1)
+        with torch.inference_mode():
+            width_labels = width_labels[
+                torch.arange(T).repeat_interleave(N_PTS), 
+                min_idcs.ravel()
+            ].reshape(T, N_PTS, 1)
 
         return pt_labels, width_labels
 
