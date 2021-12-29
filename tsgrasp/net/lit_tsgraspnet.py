@@ -129,11 +129,11 @@ class LitTSGraspNet(pl.LightningModule):
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
 
-            # pt_preds.append((class_logits[b] > 0).detach().cpu().ravel())
-            # pt_labels.append(pt_labels_b.detach().cpu().ravel())
-            # add_s_losses.append(add_s_loss_b.detach().cpu())
-            # width_losses.append(width_loss_b.detach().cpu())
-            # class_losses.append(class_loss_b.detach().cpu())
+            pt_preds.append((class_logits[b] > 0).detach().cpu().ravel())
+            pt_labels.append(pt_labels_b.detach().cpu().ravel())
+            add_s_losses.append(add_s_loss_b.detach().cpu())
+            width_losses.append(width_loss_b.detach().cpu())
+            class_losses.append(class_loss_b.detach().cpu())
 
         ## Combine loss components
         loss = 0.0
@@ -143,36 +143,36 @@ class LitTSGraspNet(pl.LightningModule):
 
 
         ## Log loss components
-        # self.log(f"{stage}_loss", 
-        #     float(loss), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_add_s_loss", 
-        #     float(torch.Tensor(add_s_losses).mean()), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_bce_loss", 
-        #     float(torch.Tensor(class_losses).mean()), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_width_loss", 
-        #     float(torch.Tensor(width_losses).mean()), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_accuracy", 
-        #     float(np.mean([accuracy(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_true_pos", 
-        #     float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_false_pos", 
-        #     float(np.mean([false_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_true_neg", 
-        #     float(np.mean([true_negative(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_true_pos", 
-        #     float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
-        # self.log(f"{stage}_pt_recall", 
-        #     float(np.mean([recall(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
-        #     on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_loss", 
+            float(loss), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_add_s_loss", 
+            float(torch.Tensor(add_s_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_bce_loss", 
+            float(torch.Tensor(class_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_width_loss", 
+            float(torch.Tensor(width_losses).mean()), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_accuracy", 
+            float(np.mean([accuracy(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_false_pos", 
+            float(np.mean([false_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_neg", 
+            float(np.mean([true_negative(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_true_pos", 
+            float(np.mean([true_positive(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
+        self.log(f"{stage}_pt_recall", 
+            float(np.mean([recall(pred, label) for pred, label in zip(pt_preds, pt_labels)])), 
+            on_step=True, on_epoch=True, sync_dist=True)
 
         return {
             'loss': loss
