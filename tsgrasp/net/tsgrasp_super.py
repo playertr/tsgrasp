@@ -254,7 +254,6 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
     def class_width_labels(
         contact_pts: torch.Tensor,
         positions: torch.Tensor,
-        grasp_widths: torch.Tensor,
         pt_radius: float
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get the pointwise class labels and width labels for a "singly batched" set of grasp contact information.
@@ -262,7 +261,6 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         Args:
             contact_pts (torch.Tensor): (T, N_GT_GRASPS, 2, 3) positive grasp contact points.
             positions (torch.Tensor): (T, N_PTS, 3) camera-frame point cloud
-            grasp_widths (torch.Tensor): (T, N_GT_GRASPS, 1) distances between fingers for ground truth grasps
             pt_radius (float): distance threshold for labeling points
 
         Returns:
@@ -270,18 +268,21 @@ class TSGraspSuper(abc.ABC, torch.nn.Module):
         """
 
         T, N_PTS, _3 = positions.shape
+        if contact_pts.shape[1] == 0:
+            return torch.zeros((T, N_PTS, 1), dtype=bool, device=contact_pts.device), None
 
-        ## Stack and nan-filter contact points
+        ## Calculate all grasp widths
+        grasp_widths = torch.linalg.norm(
+            contact_pts[...,0, :] - contact_pts[...,1, :],
+            dim=-1
+        ).unsqueeze(-1) # (T, N_GT_GRASPS_i, 1)
+
+        ## Stack contact points
         # Concatenate the left and right contact points
         contact_pts = torch.cat([
             contact_pts[:,:,0,:], contact_pts[:,:,1,:]
             ], dim=-2
         ) # (T, 2N_GT_GRASPS_i, 3)
-        # Filter away nans
-        contact_pts = contact_pts[~contact_pts.isnan()].reshape(T, -1, 3)
-
-        if contact_pts.shape[1] == 0:
-            return torch.zeros((T, N_PTS, 1), dtype=bool, device=contact_pts.device), None
 
         ## Class labels
         # Find closest ground truth points for labeling
