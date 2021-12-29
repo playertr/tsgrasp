@@ -96,7 +96,6 @@ class LitTSGraspNet(pl.LightningModule):
 
         ## Make predictions 
         class_logits, baseline_dir, approach_dir, grasp_offset, _ = self.forward(positions)
-        torch.cuda.synchronize()
 
         ## Compute labels and losses. Do this in series over batches, because each batch might have different numbers of contact points.
         pt_preds = []
@@ -112,7 +111,6 @@ class LitTSGraspNet(pl.LightningModule):
                 contact_pts[b], positions[b], 
                 self.model.pt_radius
             )
-            torch.cuda.synchronize()
             
             ## Compute losses
             add_s_loss_b, width_loss_b, class_loss_b = self.model.losses(
@@ -125,8 +123,7 @@ class LitTSGraspNet(pl.LightningModule):
                 self.model.top_conf_quantile,
                 pt_labels_b,
                 width_labels_b
-            )
-            torch.cuda.synchronize()
+            )  
 
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
@@ -137,14 +134,12 @@ class LitTSGraspNet(pl.LightningModule):
             add_s_losses.append(add_s_loss_b.detach().cpu())
             width_losses.append(width_loss_b.detach().cpu())
             class_losses.append(class_loss_b.detach().cpu())
-            torch.cuda.synchronize()
 
         ## Combine loss components
         loss = 0.0
         loss += self.model.add_s_loss_coeff * add_s_loss
         loss += self.model.bce_loss_coeff * class_loss
         loss += self.model.width_loss_coeff * width_loss
-
 
         ## Log loss components
         self.log(f"{stage}_loss", 
@@ -182,6 +177,7 @@ class LitTSGraspNet(pl.LightningModule):
             'loss': loss
         }
     
+    # Pytorch Lightning flow of control is as follows.
     # on_train_start()
     # for epoch in epochs:
     #   on_train_epoch_start()
