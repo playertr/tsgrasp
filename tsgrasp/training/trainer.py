@@ -63,8 +63,8 @@ class Trainer:
 
         kwargs = dict(strategy=DDPPlugin(find_unused_parameters=True)) if cfg.training.gpus > 1 else {}
 
-        # if True:
-        #     kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
+        if True:
+            kwargs.update(dict(overfit_batches=1, check_val_every_n_epoch=100))
         from pytorch_lightning.profiler import PyTorchProfiler
         profiler = PyTorchProfiler(filename="tsgrasp.prof")
         self.trainer = pl.Trainer(
