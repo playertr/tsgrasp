@@ -9,8 +9,8 @@ data:
     points_per_frame: 45000
 
 training:
-  batch_size: 8
-  gpus: 1
+  batch_size: 3
+  gpus: 8
 
   use_wandb: False
   wandb:
