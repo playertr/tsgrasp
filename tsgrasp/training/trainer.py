@@ -73,6 +73,7 @@ class Trainer:
             callbacks=_callbacks,
             max_epochs=cfg.training.max_epochs,
             resume_from_checkpoint=ckpt,
+            profiler='pytorch',
             **kwargs
         )
 
