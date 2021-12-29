@@ -79,15 +79,6 @@ class LitTemporalContactTorchNet(pl.LightningModule):
         contact_pts = batch['pos_contact_pts_cam'] 
         # (B,) list of (T, N_GT_GRASPS_i, 2, 3) tensors of gripper contact points (for left and right fingers) in the mesh frame
 
-        grasp_widths = [
-            torch.linalg.norm(
-                cp[...,0, :] - cp[...,1, :],
-                dim=-1
-            ).unsqueeze(-1)
-            for cp in contact_pts
-        ]
-        # (B,) list of 10, N_GT_GRASPS_i, 1)
-
         B, T, N_PTS, D = positions.shape
         assert B == 1, "Only batch size of one supported for CTN."
 
@@ -114,8 +105,7 @@ class LitTemporalContactTorchNet(pl.LightningModule):
             ## Compute labels
             pt_labels_b, width_labels_b = self.model.class_width_labels(
                 contact_pts[0][t].unsqueeze(0), 
-                pred_points, 
-                grasp_widths[0][t].unsqueeze(0), 
+                pred_points,
                 self.model.pt_radius
             )
 
