@@ -25,28 +25,28 @@ class TSGraspNet(TSGraspSuper):
         )
         self.binary_seg_head = nn.Sequential(
                 nn.Conv1d(cfg.backbone_out_dim, 128, 1),
-                nn.ReLU(),
+                # nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.5),
                 nn.Conv1d(128, 1, 1)
         )
         self.baseline_dir_head = nn.Sequential(
                 nn.Conv1d(cfg.backbone_out_dim, 128, 1),
-                nn.ReLU(),
+                # nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 3, 1)
         )
         self.approach_dir_head = nn.Sequential(
                 nn.Conv1d(cfg.backbone_out_dim, 128, 1),
-                nn.ReLU(),
+                # nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 3, 1)
         )
         self.grasp_offset_head = nn.Sequential(
                 nn.Conv1d(cfg.backbone_out_dim, 128, 1),
-                nn.ReLU(),
+                # nn.ReLU(),
                 nn.BatchNorm1d(128),
                 nn.Dropout(p=0.3),
                 nn.Conv1d(128, 1, 1)
