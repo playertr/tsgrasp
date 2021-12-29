@@ -92,15 +92,6 @@ class LitTSGraspNet(pl.LightningModule):
         contact_pts = batch['pos_contact_pts_cam'] 
         # (B,) list of (T, N_GT_GRASPS_i, 2, 3) tensors of gripper contact points (for left and right fingers) in the mesh frame
 
-        grasp_widths = [
-            torch.linalg.norm(
-                cp[...,0, :] - cp[...,1, :],
-                dim=-1
-            ).unsqueeze(-1)
-            for cp in contact_pts
-        ]
-        # (B,) list of 10, N_GT_GRASPS_i, 1)
-
         B, T, N_PTS, D = positions.shape
 
         ## Make predictions 
@@ -117,7 +108,7 @@ class LitTSGraspNet(pl.LightningModule):
 
             ## Compute labels
             pt_labels_b, width_labels_b = self.model.class_width_labels(
-                contact_pts[b], positions[b], grasp_widths[b], 
+                contact_pts[b], positions[b], 
                 self.model.pt_radius
             )
             
