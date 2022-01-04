@@ -15,10 +15,10 @@ model:
 
 training:
   batch_size: 3
-  gpus: 8
+  gpus: 2
 
   use_wandb: False
   wandb:
     project: "TSGrasp"
     experiment: "tsgrasp_minkunet34C"
-    notes: "Run with MinkUNet34C."
+    notes: "Run with MinkUNet34C 01/03/2022."
