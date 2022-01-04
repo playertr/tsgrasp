@@ -611,6 +611,8 @@ class STRes16UNet14A(STRes16UNetBase, Res16UNet14A):
 class STRes16UNet14B(Res16UNet14B): # Tim
     CONV_TYPE = ConvType.SPATIO_TEMPORAL_HYPERCROSS
 
+class STRes16UNet34C(Res16UNet34C): # Tim
+    CONV_TYPE = ConvType.SPATIO_TEMPORAL_HYPERCROSS
 
 class STRes16UNet18(STRes16UNetBase, Res16UNet18):
     pass
