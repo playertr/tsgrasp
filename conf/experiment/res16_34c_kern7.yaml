@@ -17,7 +17,7 @@ model:
 
 training:
   batch_size: 3
-  gpus: 8
+  gpus: 2
 
   use_wandb: False
   wandb:
