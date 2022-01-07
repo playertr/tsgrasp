@@ -9,9 +9,19 @@ Download `acronym.tar.gz` from the ACRONYM Github [page](https://github.com/NVla
 3. Install the postprocessing tools, Manifold and Simplify.
 Follow the instructions on the ACRONYM Github [page](https://github.com/NVlabs/acronym) to download and compile the Manifold [software](https://github.com/hjwdzh/Manifold) for mesh processing.
 
-4. Create a conda environment with the data generation dependencies.
+4. Update the configuration file with the locations of manifold and simplify.
+Record the paths to the executables from step 3 into the respective fields of `/conf/scripts/generate_data.yaml`.
+
+5. Create a conda environment with the data generation dependencies.
 ```
 conda env create -f tsgrasp/data/data_generation/gen_data_env.yml
 ```
 
-5. Update the configuration file with the locations 
+6. Run the data generation script.
+```
+conda activate gen_data_env
+python -m scripts.generate_data
+```
+
+
+
