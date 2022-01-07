@@ -1,13 +1,8 @@
 """
 add_contact_points.py
 Script for determining the two 3D contact points of 6DOF grasps from the ACRONYM dataset. Uses utilities from Contact GraspNet.
-Tim Player, playert@oregonstate.edu, July 29 2020
+Tim Player, playert@oregonstate.edu, July 29 2021
 """
-
-CGN_DIR = "/home/tim/Research/contact_graspnet"
-ACRONYM_DIR = "/home/tim/Research/acronym"
-MESH_ROOT = "/home/tim/Research/acronym/data/shapenetsem/models-OBJ/simplified/"
-GRASPS_ROOT = "/home/tim/Research/GraspRefinement/data/contact_points"
 
 import os
 import numpy as np
@@ -15,16 +10,12 @@ import h5py
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 import csv
-
+from omegaconf import DictConfig
+from functools import partial
 import sys
 
-sys.path.insert(0, CGN_DIR)
-from tools.create_contact_infos import grasps_contact_info
-
-sys.path.insert(0, ACRONYM_DIR)
-from acronym_tools import load_mesh, load_grasps
-
-def append_grasp_info(h5_path):
+def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact_info):
+    """Generate contact points and append them to a single file."""
 
     # Check to see whether this file has been modified yet
     with h5py.File(h5_path) as ds:
@@ -33,7 +24,7 @@ def append_grasp_info(h5_path):
 
     # load mesh. Not all meshes were successfully made, so wrap in Try/Exc
     try:
-        obj_mesh = load_mesh(filename=h5_path, mesh_root_dir=MESH_ROOT)
+        obj_mesh = load_mesh(filename=h5_path, mesh_root_dir=mesh_root)
     except ValueError as e:
         print(e)
         return False
@@ -72,16 +63,35 @@ def append_grasp_info(h5_path):
 
     return True
 
-def main():
-    h5_paths = [os.path.join(GRASPS_ROOT, f) for f in os.listdir(GRASPS_ROOT) if f.endswith(".h5")]
+def add_contact_points(cfg: DictConfig):
+    h5_paths = [os.path.join(cfg.DS_DIR, f) for f in os.listdir(cfg.DS_DIR) if f.endswith(".h5")]
+
+    # Dynamically import tools from ACRONYM and Contact-Graspnet
+    # for loading meshes and adding contact points.
+    # We import this way so that we can specify the path to their repos in yaml.
+    sys.path.insert(0, cfg.CONTACT_GRASPNET_REPO)
+    from tools.create_contact_infos import grasps_contact_info
+
+    sys.path.insert(0, cfg.ACRONYM_REPO)
+    from acronym_tools import load_mesh, load_grasps
 
     # append_grasp_info(h5_paths[0])
     # append_grasp_info('/home/tim/Research/acronym/data/grasps/6Shelves_aa7c53c8744d9a24d810b14a81e12eca_0.003885597554766574.h5')
 
+    append_grasp = partial(append_grasp_info, 
+        mesh_root=cfg.MESH_DIR,
+        load_mesh=load_mesh,
+        load_grasps=load_grasps,
+        grasps_contact_info=grasps_contact_info
+    )
+
+    ## DEBUG
+    h5_paths = h5_paths[:50]
+
     with Pool(cpu_count()-2) as p:
         successes = list(
             tqdm(
-                p.imap_unordered(append_grasp_info, h5_paths),
+                p.imap_unordered(append_grasp, h5_paths),
                 total=len(h5_paths)
             )
     )
@@ -92,8 +102,3 @@ def main():
     with open('add_contacts_out.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(h5_paths, successes))
-    
-
-if __name__ == "__main__":
-    main()
-
