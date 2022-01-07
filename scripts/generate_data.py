@@ -9,10 +9,10 @@ import os
 @hydra.main(config_path="../conf", config_name="scripts/generate_data")
 def main(cfg : DictConfig):
 
-    # print("####################################################")
-    # print(f"Simplifying the meshes in {cfg.MESH_DIR} "
-    #     f"and writing the results to {cfg.convert_meshes.OUTPUT_DIR} .")
-    # convert_meshes(cfg.convert_meshes)
+    print("####################################################")
+    print(f"Simplifying the meshes in {cfg.MESH_DIR} "
+        f"and writing the results to {cfg.convert_meshes.OUTPUT_DIR} .")
+    convert_meshes(cfg.convert_meshes)
 
     print("####################################################")
     print(f"Generating grasp contact points.")

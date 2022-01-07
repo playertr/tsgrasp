@@ -1,0 +1,46 @@
+# @package _global_
+
+## Dataset directories
+ACRONYM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/acronym/grasps/
+SHAPENETSEM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/models-OBJ/
+
+## External dependency repos
+CONTACT_GRASPNET_REPO : /home/tim/Research/contact_graspnet
+ACRONYM_REPO          : /home/tim/Research/acronym
+
+SIMPLIFIED_MESH_DIR : ${hydra:runtime.cwd}/data/obj/
+OUTPUT_DATASET_DIR  : ${hydra:runtime.cwd}/data/dataset
+
+convert_meshes:
+  MANIFOLD_PATH : /home/tim/Research/Manifold/build/manifold
+  SIMPLIFY_PATH : /home/tim/Research/Manifold/build/simplify
+  MESH_DIR      : ${SHAPENETSEM_DIR}
+  GRASP_DIR     : ${ACRONYM_DIR}
+  OUTPUT_DIR    : ${SIMPLIFIED_MESH_DIR}
+
+MESH_DIR              : ${hydra:runtime.cwd}/data/raw_datasets/models-OBJ/
+
+add_contact_points:
+  DS_DIR        : ${OUTPUT_DATASET_DIR}
+  MESH_DIR      : ${SIMPLIFIED_MESH_DIR}
+  CONTACT_GRASPNET_REPO : ${CONTACT_GRASPNET_REPO}
+  ACRONYM_REPO          : ${ACRONYM_REPO}
+
+## Directory containing the .h5 files containing, for individual objects
+# - object-frame grasp info from ACRONYM
+# - object-frame contact points from Contact-GraspNet
+# - Trajectory info
+#   - sequence of 4x4 camera-object transforms
+#   - sequence of depth images
+
+## Directory containing the .h5 files containing, for individual objects,
+# - object mesh file name
+# - object-frame grasp info from ACRONYM
+# - object-frame contact points from Contact-GraspNet
+
+render_trajectories:
+  DS_DIR          : ${OUTPUT_DATASET_DIR}
+  ACRONYM_REPO    : ${ACRONYM_REPO}
+  MESH_DIR        : ${SIMPLIFIED_MESH_DIR}
+  TRAJ_PER_OBJECT : 3
+  FRAMES_PER_TRAJ : 30
