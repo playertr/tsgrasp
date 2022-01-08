@@ -40,11 +40,13 @@ def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out
     outfile = out_dir + path
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
     completed = subprocess.run([simplify_path, "-i", temp_name, "-o", outfile, "-m", "-r", "0.02"],  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    os.remove(temp_name)
-
+    
     if completed.returncode != 0:
         print(f"Skipping object (simplify failed): {h}")
+        return
         
+    os.remove(temp_name)
+
 def convert_meshes(cfg: DictConfig):
     """Waterproof and simplify the OBJ meshes in cfg.GRASP_DIR."""
 
