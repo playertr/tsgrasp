@@ -21,6 +21,10 @@ def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out
         simplify_path (str): path to `simplify` executable
         out_dir (str): parent directory for output mesh
     """
+    outfile = out_dir + path
+    if os.path.isfile(outfile): # already done
+        return
+
     tokens = path.split("/")
     h = tokens[-1][:-4] # hash
 
@@ -37,7 +41,6 @@ def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out
         return
             
     # Simplify the object
-    outfile = out_dir + path
     os.makedirs(os.path.dirname(outfile), exist_ok=True)
     completed = subprocess.run([simplify_path, "-i", temp_name, "-o", outfile, "-m", "-r", "0.02"],  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
