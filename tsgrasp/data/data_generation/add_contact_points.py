@@ -13,19 +13,8 @@ import csv
 from omegaconf import DictConfig
 from functools import partial
 import sys
+from rtree.exceptions import RTreeError
 
-def no_raise(fn):
-    """Decorator that forbids a function from raising an Exception.
-    """
-    def wrapped_fn(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except Exception as e:
-            print(e)
-            return
-    return wrapped_fn
-
-@no_raise
 def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact_info):
     """Generate contact points and append them to a single file."""
 
@@ -46,6 +35,9 @@ def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact
     try:
         contact_dicts = grasps_contact_info(grasp_tfs=T, successfuls=success, obj_mesh=obj_mesh, check_collisions=True)
     except AttributeError as e: # NoneType object has no attribute 'faces'
+        print(e)
+        return False
+    except RTreeError as e: # obscure, maybe memory-related error?
         print(e)
         return False
 
