@@ -88,7 +88,7 @@ def convert_meshes(cfg: DictConfig):
     # paths = paths[:50]
 
     ## Issue the commands in a multiprocessing pool
-    with Pool(cpu_count()-2) as p:
+    with Pool(cfg.PROCESSES) as p:
         examples = list(
             tqdm(
                 p.imap_unordered(process_obj, paths),

@@ -227,7 +227,7 @@ def render_trajectories(cfg : DictConfig):
     # h5_paths = h5_paths[:50]
 
     # Save trajectory data for each .h5 grasp file, in parallel.
-    with Pool(cpu_count()-2) as p:
+    with Pool(cfg.PROCESSES) as p:
         successes = list(
             tqdm(
                 p.imap_unordered(make_trajectories, h5_paths),

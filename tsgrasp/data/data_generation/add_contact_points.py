@@ -88,7 +88,7 @@ def add_contact_points(cfg: DictConfig):
     ## DEBUG
     # h5_paths = h5_paths[:50]
 
-    with Pool(cpu_count()-2) as p:
+    with Pool(cfg.PROCESSES) as p:
         successes = list(
             tqdm(
                 p.imap_unordered(append_grasp, h5_paths),
