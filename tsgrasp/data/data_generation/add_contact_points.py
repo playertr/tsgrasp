@@ -15,8 +15,9 @@ from functools import partial
 import sys
 from rtree.exceptions import RTreeError
 
-def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact_info):
+def append_grasp_info(h5_path, mesh_root):
     """Generate contact points and append them to a single file."""
+    global load_mesh, load_grasps, grasps_contact_info
 
     # Check to see whether this file has been modified yet
     with h5py.File(h5_path) as ds:
@@ -68,25 +69,23 @@ def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact
     return True
 
 def add_contact_points(cfg: DictConfig):
-    h5_paths = [os.path.join(cfg.DS_DIR, f) for f in os.listdir(cfg.DS_DIR) if f.endswith(".h5")]
 
     # Dynamically import tools from ACRONYM and Contact-Graspnet
     # for loading meshes and adding contact points.
     # We import this way so that we can specify the path to their repos in yaml.
+    # We make them global so we're not passing expensive arguments between processes.
+    global grasps_contact_info, load_mesh, load_grasps
     sys.path.insert(0, cfg.CONTACT_GRASPNET_REPO)
     from tools.create_contact_infos import grasps_contact_info
 
     sys.path.insert(0, cfg.ACRONYM_REPO)
     from acronym_tools import load_mesh, load_grasps
 
-    # append_grasp_info(h5_paths[0])
-    # append_grasp_info('/home/tim/Research/acronym/data/grasps/6Shelves_aa7c53c8744d9a24d810b14a81e12eca_0.003885597554766574.h5')
+
+    h5_paths = [os.path.join(cfg.DS_DIR, f) for f in os.listdir(cfg.DS_DIR) if f.endswith(".h5")]
 
     append_grasp = partial(append_grasp_info, 
-        mesh_root=cfg.MESH_DIR,
-        load_mesh=load_mesh,
-        load_grasps=load_grasps,
-        grasps_contact_info=grasps_contact_info
+        mesh_root=cfg.MESH_DIR
     )
 
     ## DEBUG
