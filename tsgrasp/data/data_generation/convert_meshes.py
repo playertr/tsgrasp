@@ -10,6 +10,18 @@ from omegaconf import DictConfig
 from functools import partial
 import h5py
 
+def no_raise(fn):
+    """Decorator that forbids a function from raising an Exception.
+    """
+    def wrapped_fn(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            return
+    return wrapped_fn
+
+@no_raise
 def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out_dir: str):
     """Process a single object file by calling a subshell with the mesh processing script.
 
