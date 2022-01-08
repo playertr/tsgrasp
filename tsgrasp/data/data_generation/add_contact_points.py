@@ -14,6 +14,18 @@ from omegaconf import DictConfig
 from functools import partial
 import sys
 
+def no_raise(fn):
+    """Decorator that forbids a function from raising an Exception.
+    """
+    def wrapped_fn(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            return
+    return wrapped_fn
+
+@no_raise
 def append_grasp_info(h5_path, mesh_root, load_mesh, load_grasps, grasps_contact_info):
     """Generate contact points and append them to a single file."""
 
