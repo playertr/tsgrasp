@@ -47,7 +47,7 @@ def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out
     
     try:
         os.remove(temp_name)
-    except:
+    except FileNotFoundError:
         print(f"That's weird! {temp_name} was not created!")
 
 def convert_meshes(cfg: DictConfig):
