@@ -86,7 +86,7 @@ def add_contact_points(cfg: DictConfig):
     )
 
     ## DEBUG
-    h5_paths = h5_paths[:50]
+    # h5_paths = h5_paths[:50]
 
     with Pool(cpu_count()-2) as p:
         successes = list(

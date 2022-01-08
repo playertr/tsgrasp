@@ -224,7 +224,7 @@ def render_trajectories(cfg : DictConfig):
     )
 
     ## DEBUG
-    h5_paths = h5_paths[:50]
+    # h5_paths = h5_paths[:50]
 
     # Save trajectory data for each .h5 grasp file, in parallel.
     with Pool(cpu_count()-2) as p:

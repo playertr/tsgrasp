@@ -65,7 +65,7 @@ def convert_meshes(cfg: DictConfig):
     )
 
     ## DEBUG
-    paths = paths[:50]
+    # paths = paths[:50]
 
     ## Issue the commands in a multiprocessing pool
     with Pool(cpu_count()-2) as p:
