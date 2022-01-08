@@ -44,8 +44,11 @@ def process_hash(path, obj_dir: str, manifold_path: str, simplify_path: str, out
     if completed.returncode != 0:
         print(f"Skipping object (simplify failed): {h}")
         return
-        
-    os.remove(temp_name)
+    
+    try:
+        os.remove(temp_name)
+    except:
+        print(f"That's weird! {temp_name} was not created!")
 
 def convert_meshes(cfg: DictConfig):
     """Waterproof and simplify the OBJ meshes in cfg.GRASP_DIR."""
