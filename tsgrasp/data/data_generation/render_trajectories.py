@@ -4,6 +4,9 @@ A module for creating RGB-D videos annotated with grasps from the ACRONYM datase
 Tim Player playert@oregonstate.edu July 22, 2021
 """
 
+import os
+os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
+
 import trimesh
 import numpy as np
 import os
@@ -110,95 +113,95 @@ def make_trajectories_for_path(h5_path, traj_per_object, frames_per_traj, mesh_d
         m = load_mesh(h5_path, mesh_root_dir=mesh_dir)
 
 
-        traj_ds = h5py.File(h5_path, 'r+')
+        with h5py.File(h5_path, 'r+') as traj_ds:
+            if sum('pitch' in k for k in traj_ds.keys()) >= traj_per_object: # already done
+                return True
 
-        for i in range(traj_per_object):
-            ## Define floor and object
-            support_mesh = trimesh.creation.cylinder(radius=100, height=1)
+            for i in range(traj_per_object):
+                ## Define floor and object
+                support_mesh = trimesh.creation.cylinder(radius=100, height=1)
 
-            ## Create Scene object and add the meshes
-            scene = PyrenderScene()
-            scene.add_object("support_object", support_mesh, pose=np.eye(4), support=True)
+                ## Create Scene object and add the meshes
+                scene = PyrenderScene()
+                scene.add_object("support_object", support_mesh, pose=np.eye(4), support=True)
 
-            ## Define object location and add object to scene
-            obj_pose = np.array([
-                [1, 0, 0, 0],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0.527],
-                [0, 0, 0, 1]
-            ])
+                ## Define object location and add object to scene
+                obj_pose = np.array([
+                    [1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0.527],
+                    [0, 0, 0, 1]
+                ])
 
-            scene.add_object("obj0", m, pose=obj_pose, support=False)
+                scene.add_object("obj0", m, pose=obj_pose, support=False)
 
-            ## Create rendering machinery: SceneRenderer and camera
-            renderer = SceneRenderer(scene, width=300, height=300)
-            trimesh_camera = renderer.get_trimesh_camera()
+                ## Create rendering machinery: SceneRenderer and camera
+                renderer = SceneRenderer(scene, width=300, height=300)
+                trimesh_camera = renderer.get_trimesh_camera()
 
-            ## Create random trajectory
-            poses, traj_name = make_trajectory(trimesh_camera, obj_pose[:3, 3], num_frames=frames_per_traj)
-            # TODO: save a relative pose, not the camera pose. This will make it possible to do a simple multiplication to transform.
+                ## Create random trajectory
+                poses, traj_name = make_trajectory(trimesh_camera, obj_pose[:3, 3], num_frames=frames_per_traj)
+                # TODO: save a relative pose, not the camera pose. This will make it possible to do a simple multiplication to transform.
 
-            ## Step through trajectory and render images
-            color_ims = []
-            depth_ims = []
-            pcs = []
-            seg_ims = []
-            for i, camera_pose in enumerate(poses):
-                color, depth, pc, segmentation = renderer.render(camera_pose=camera_pose, target_id="obj0")
+                ## Step through trajectory and render images
+                color_ims = []
+                depth_ims = []
+                pcs = []
+                seg_ims = []
+                for i, camera_pose in enumerate(poses):
+                    color, depth, pc, segmentation = renderer.render(camera_pose=camera_pose, target_id="obj0")
 
-                color_ims.append(color)
-                depth_ims.append(depth)
-                pcs.append(pc)
-                seg_ims.append(segmentation)
+                    color_ims.append(color)
+                    depth_ims.append(depth)
+                    pcs.append(pc)
+                    seg_ims.append(segmentation)
 
-            # Turn lists of images into ndarrays
-            color_ims = np.stack(color_ims)
-            depth_ims = np.stack(depth_ims)
-            pcs = np.stack(pcs)
-            seg_ims = np.stack(seg_ims)
+                # Turn lists of images into ndarrays
+                color_ims = np.stack(color_ims)
+                depth_ims = np.stack(depth_ims)
+                pcs = np.stack(pcs)
+                seg_ims = np.stack(seg_ims)
 
-            # Turn list of poses into ndarray
-            poses = np.stack(poses)
+                # Turn list of poses into ndarray
+                poses = np.stack(poses)
 
-            # Get transformation from camera frame to object frame
-            tf_from_cam_to_scene = poses.dot(
-                trimesh.transformations.euler_matrix(np.pi, 0, 0)
-            ) # camera_pose has a flipped z axis
-            tf_from_scene_to_obj = inverse_homo(obj_pose)
-            tf_from_cam_to_obj = tf_from_scene_to_obj @ tf_from_cam_to_scene
+                # Get transformation from camera frame to object frame
+                tf_from_cam_to_scene = poses.dot(
+                    trimesh.transformations.euler_matrix(np.pi, 0, 0)
+                ) # camera_pose has a flipped z axis
+                tf_from_scene_to_obj = inverse_homo(obj_pose)
+                tf_from_cam_to_obj = tf_from_scene_to_obj @ tf_from_cam_to_scene
 
-            # Read the successful contact points from the h5 file
-            contact_pts = np.asarray(traj_ds['grasps/contact_points']).astype('float')
-            contact_pts = np.concatenate(contact_pts)
-            success = np.asarray(traj_ds['grasps/qualities/flex/object_in_gripper'])
+                # Read the successful contact points from the h5 file
+                contact_pts = np.asarray(traj_ds['grasps/contact_points']).astype('float')
+                contact_pts = np.concatenate(contact_pts)
+                success = np.asarray(traj_ds['grasps/qualities/flex/object_in_gripper'])
 
-            ## Store images and poses into h5py group
-            # We name the group with a short desription of the trajectory, like "/pitch:1.09,yaw0:0.82"
+                ## Store images and poses into h5py group
+                # We name the group with a short desription of the trajectory, like "/pitch:1.09,yaw0:0.82"
 
-            traj_ds.create_group(traj_name)
-            # TODO: make a name we can iterate over more easily
+                traj_ds.create_group(traj_name)
+                # TODO: make a name we can iterate over more easily
 
-            cds = traj_ds[traj_name].create_dataset(
-                "color", np.shape(color_ims), h5py.h5t.STD_U8BE, data=color_ims, compression="gzip", compression_opts=9, chunks=np.shape(color_ims)
-            )
+                cds = traj_ds[traj_name].create_dataset(
+                    "color", np.shape(color_ims), h5py.h5t.STD_U8BE, data=color_ims, compression="gzip", compression_opts=9, chunks=np.shape(color_ims)
+                )
 
-            dds = traj_ds[traj_name].create_dataset(
-                "depth", np.shape(depth_ims), h5py.h5t.IEEE_F32BE, data=depth_ims, compression="gzip", compression_opts=9, chunks=np.shape(depth_ims)
-            )
-                
-            sds = traj_ds[traj_name].create_dataset(
-                "segmentation", np.shape(seg_ims), h5py.h5t.STD_U8BE, data=depth_ims, compression="gzip", compression_opts=9, chunks=np.shape(seg_ims)
-            )
+                dds = traj_ds[traj_name].create_dataset(
+                    "depth", np.shape(depth_ims), h5py.h5t.IEEE_F32BE, data=depth_ims, compression="gzip", compression_opts=9, chunks=np.shape(depth_ims)
+                )
+                    
+                sds = traj_ds[traj_name].create_dataset(
+                    "segmentation", np.shape(seg_ims), h5py.h5t.STD_U8BE, data=depth_ims, compression="gzip", compression_opts=9, chunks=np.shape(seg_ims)
+                )
 
-            pds = traj_ds[traj_name].create_dataset(
-                "poses", np.shape(poses), h5py.h5t.IEEE_F64BE, data=poses, compression="gzip", compression_opts=9, chunks=np.shape(poses)
-            )
-            p_co_ds = traj_ds[traj_name].create_dataset(
-                "tf_from_cam_to_obj", np.shape(tf_from_cam_to_obj), h5py.h5t.IEEE_F64BE, data=tf_from_cam_to_obj, compression="gzip", compression_opts=9, chunks=np.shape(tf_from_cam_to_obj)
-            )
-
-        traj_ds.close()
-        return True
+                pds = traj_ds[traj_name].create_dataset(
+                    "poses", np.shape(poses), h5py.h5t.IEEE_F64BE, data=poses, compression="gzip", compression_opts=9, chunks=np.shape(poses)
+                )
+                p_co_ds = traj_ds[traj_name].create_dataset(
+                    "tf_from_cam_to_obj", np.shape(tf_from_cam_to_obj), h5py.h5t.IEEE_F64BE, data=tf_from_cam_to_obj, compression="gzip", compression_opts=9, chunks=np.shape(tf_from_cam_to_obj)
+                )
+            return True
 
     except Exception as e:
         print(e)
@@ -224,13 +227,13 @@ def render_trajectories(cfg : DictConfig):
     )
 
     ## DEBUG
-    # h5_paths = h5_paths[:50]
-
+    # h5_paths = h5_paths[:2]
     # Save trajectory data for each .h5 grasp file, in parallel.
+    # successes = make_trajectories(h5_paths[0])
     with Pool(cfg.PROCESSES) as p:
         successes = list(
             tqdm(
-                p.imap_unordered(make_trajectories, h5_paths),
+                p.imap_unordered(make_trajectories, h5_paths, chunksize=1),
                 total=len(h5_paths)
             )
         )
