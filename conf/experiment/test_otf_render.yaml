@@ -1,0 +1,28 @@
+# @package _global_
+
+defaults:
+  - override /model: tsgraspnet
+  - override /data: acronym_render_dm
+
+data:
+  data_cfg:
+    dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
+    points_per_frame: 45000
+
+    num_workers: 8
+
+    frames_per_traj: 10
+
+    renderer:
+      mesh_dir: ${hydra:runtime.cwd}/data/obj/meshes
+      acronym_repo: /scratch/playert/acronym
+
+training:
+  batch_size: 3
+  gpus: 8
+
+  use_wandb: False
+  wandb:
+    project: "TSGrasp"
+    experiment: "tsgrasp_otf"
+    notes: "Run with OTF rendering, remotely-processed dataset, and last-cam-frame."
