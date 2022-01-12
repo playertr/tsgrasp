@@ -69,8 +69,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         obj_pose = np.eye(4)
         renderer = Renderer(h5_path=path, obj_pose=obj_pose, cfg=self.renderer_cfg)
         
-        trimesh_camera = renderer.renderer.get_trimesh_camera()
-        trajectory = self.make_trajectory(trimesh_camera, renderer.obj_pose[:3,3], num_frames=self.frames_per_traj)
+        trajectory = self.make_trajectory(renderer.obj_pose[:3,3], num_frames=self.frames_per_traj)
         depth_ims = renderer.render_trajectory(trajectory)
 
         pcs = [depth_to_pointcloud(d) for d in depth_ims]
@@ -131,6 +130,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         )
 
         # from tsgrasp.utils.viz.viz import draw_grasps
+        # draw_grasps(pts=positions[0], grasp_tfs=[], confs=[])
         # tfs = torch.stack([t[:50] for t in cam_frame_pos_grasp_tfs])
         # all_pos = positions.reshape(-1, 3)
         # tfs = tfs.reshape(-1, 4, 4)
@@ -141,11 +141,10 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             "cam_frame_pos_grasp_tfs": cam_frame_pos_grasp_tfs,
             "pos_contact_pts_cam": pos_contact_pts_cam,
         }
-
         return self.augmentations(data)
 
     @staticmethod
-    def make_trajectory(trimesh_camera, obj_loc: np.ndarray, num_frames : int, seed=None):
+    def make_trajectory(obj_loc: np.ndarray, num_frames : int, seed=None):
         """Create a "random" trajectory that views the object.
         Initially, these trajectories will be circular orbits that always look directly at the object, at different elevation angles.
 
@@ -302,6 +301,6 @@ if __name__ == "__main__":
 
     tds = TrajectoryDataset(cfg, split="train")
 
-    print(tds[1])
+    print(tds[3])
 
     print("done")
