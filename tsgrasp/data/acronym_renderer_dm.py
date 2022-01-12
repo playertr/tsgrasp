@@ -39,6 +39,14 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         return len(self._paths)
 
     def __getitem__(self, idx):
+        try:
+            return self.getitem(idx)
+        except Exception as e:
+            print(e)
+            print("Trying random index. Don't tell my advisor.")
+            return self.getitem(np.random.randint(low=0, high=self.__len__()))
+
+    def getitem(self, idx):
 
         """Generate a random trajectory using the grasp information in this .h5 file."""
 
