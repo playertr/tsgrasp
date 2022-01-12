@@ -4,9 +4,10 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 from tsgrasp.data.renderer import Renderer
+from tsgrasp.data.augmentations import RandomJitter, RandomRotation
 import trimesh
 
-from tsgrasp.utils.utils import transform
+from tsgrasp.utils.utils import transform, compose
 
 class TrajectoryDataset(torch.utils.data.Dataset):
     """
@@ -30,6 +31,15 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             self._paths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.h5')]
         else:
             raise ValueError("Split %s not recognised" % split)
+
+        augmentations = []
+        if cfg.augmentations.add_random_jitter:
+            augmentations.append(RandomJitter(sigma=cfg.augmentations.random_jitter_sigma))
+        
+        if cfg.augmentations.add_random_rotations:
+            augmentations.append(RandomRotation())
+
+        self.augmentations = compose(*augmentations)
 
     def download(self):
         if len(os.listdir(self.raw_dir)) == 0:
@@ -124,7 +134,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             "pos_contact_pts_cam": pos_contact_pts_cam,
         }
 
-        return data
+        return self.augmentations(data)
 
     @staticmethod
     def make_trajectory(trimesh_camera, obj_loc: np.ndarray, num_frames : int, seed=None):
@@ -265,12 +275,21 @@ if __name__ == "__main__":
         mesh_dir="/home/tim/Research/tsgrasp/data/obj/"
         acronym_repo="/home/tim/Research/acronym"
 
+
+    @dataclass
+    class augment_cfg:
+        add_random_jitter = True
+        random_jitter_sigma = 0.001
+        add_random_rotations = True
+
     @dataclass
     class Cfg:
         frames_per_traj=4
         dataroot="/home/tim/Research/tsgrasp/data/acronymvid"
         renderer=render_cfg()
         points_per_frame=45000
+        augmentations=augment_cfg()
+
     cfg = Cfg()
 
     tds = TrajectoryDataset(cfg, split="train")
