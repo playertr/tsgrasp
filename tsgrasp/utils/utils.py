@@ -1,5 +1,8 @@
 
 import torch
+from functools import reduce
+from typing import Callable
+
 def transform(m: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
     """Transform the batched vector or pose matrix `m` by batch transform `tf`.
 
@@ -16,6 +19,27 @@ def transform(m: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
         return transform_vec(m, tf)
     elif m.shape[-2:] == (4, 4):
         return transform_mat(m, tf)
+
+def transform_unbatched(m: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
+    """Transform the arbitrarly batched tensor `m` by the (4,4) transform `tf`.
+
+    Args:
+        m (torch.Tensor): (...,4) or (..., 3) tensor
+        tf (torch.Tensor): (4, 4) homogeneous transform matrix)
+
+    Returns:
+        torch.Tensor: transformed input tensor with same shape as m
+    """
+    assert tf.shape == (4,4), "transform_nonbatched expects a single homogeneous tf."
+
+    m_shape = m.shape
+    if m_shape[-1] == 3:
+        m = m.reshape(-1, 3)
+        m = torch.cat([m, torch.ones((*m.shape[:-1], 1))], dim=-1)
+        return (tf @ m.unsqueeze(-1))[...,:3,:].reshape(*m_shape)
+    elif m_shape[-2:] == (4,4):
+        m = m.reshape(-1, 4, 4)
+        return (tf @ m).reshape(m_shape)
 
 def transform_mat(pose: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
     """Transform homogenous transformation `pose` by homogenous transformation `tf`.
@@ -72,3 +96,8 @@ def transform_vec(x: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
     tf = tf.reshape(tf.shape[0], *([1]*(x_dim-3)), 4, 4)
 
     return (x_homog @ tf.transpose(-2, -1))[..., :3]
+
+def compose(*funcs) -> Callable:
+    """Compose a list of functions, called from left to right."""
+    # https://stackoverflow.com/questions/16739290/composing-functions-in-python
+    return lambda x: reduce(lambda acc, f: f(acc), funcs, x)
