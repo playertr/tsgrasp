@@ -11,6 +11,7 @@ def transform(m: torch.Tensor, tf: torch.Tensor) -> torch.Tensor:
         torch.Tensor: (b, ..., 3) or (b, ..., 4, 4) transformed poses or vectors.
     """
     # TODO: refactor batch handling by reshaping the arguments to transform_vec
+    assert m.shape[0] == tf.shape[0], "Arguments must have same batch dimension."
     if m.shape[-1] == 3:
         return transform_vec(m, tf)
     elif m.shape[-2:] == (4, 4):
