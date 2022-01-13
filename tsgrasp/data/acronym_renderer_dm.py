@@ -4,9 +4,10 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 from tsgrasp.data.renderer import Renderer
+from tsgrasp.data.augmentations import RandomJitter, RandomRotation
 import trimesh
 
-from tsgrasp.utils.utils import transform
+from tsgrasp.utils.utils import transform, compose
 
 class TrajectoryDataset(torch.utils.data.Dataset):
     """
@@ -30,6 +31,15 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             self._paths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.h5')]
         else:
             raise ValueError("Split %s not recognised" % split)
+
+        augmentations = []
+        if cfg.augmentations.add_random_jitter:
+            augmentations.append(RandomJitter(sigma=cfg.augmentations.random_jitter_sigma))
+        
+        if cfg.augmentations.add_random_rotations:
+            augmentations.append(RandomRotation())
+
+        self.augmentations = compose(*augmentations)
 
     def download(self):
         if len(os.listdir(self.raw_dir)) == 0:
@@ -59,8 +69,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         obj_pose = np.eye(4)
         renderer = Renderer(h5_path=path, obj_pose=obj_pose, cfg=self.renderer_cfg)
         
-        trimesh_camera = renderer.renderer.get_trimesh_camera()
-        trajectory = self.make_trajectory(trimesh_camera, renderer.obj_pose[:3,3], num_frames=self.frames_per_traj)
+        trajectory = self.make_trajectory(renderer.obj_pose[:3,3], num_frames=self.frames_per_traj)
         depth_ims = renderer.render_trajectory(trajectory)
 
         pcs = [depth_to_pointcloud(d) for d in depth_ims]
@@ -121,6 +130,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         )
 
         # from tsgrasp.utils.viz.viz import draw_grasps
+        # draw_grasps(pts=positions[0], grasp_tfs=[], confs=[])
         # tfs = torch.stack([t[:50] for t in cam_frame_pos_grasp_tfs])
         # all_pos = positions.reshape(-1, 3)
         # tfs = tfs.reshape(-1, 4, 4)
@@ -131,11 +141,10 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             "cam_frame_pos_grasp_tfs": cam_frame_pos_grasp_tfs,
             "pos_contact_pts_cam": pos_contact_pts_cam,
         }
-
-        return data
+        return self.augmentations(data)
 
     @staticmethod
-    def make_trajectory(trimesh_camera, obj_loc: np.ndarray, num_frames : int, seed=None):
+    def make_trajectory(obj_loc: np.ndarray, num_frames : int, seed=None):
         """Create a "random" trajectory that views the object.
         Initially, these trajectories will be circular orbits that always look directly at the object, at different elevation angles.
 
@@ -273,16 +282,25 @@ if __name__ == "__main__":
         mesh_dir="/home/tim/Research/tsgrasp/data/obj/"
         acronym_repo="/home/tim/Research/acronym"
 
+
+    @dataclass
+    class augment_cfg:
+        add_random_jitter = True
+        random_jitter_sigma = 0.001
+        add_random_rotations = True
+
     @dataclass
     class Cfg:
         frames_per_traj=4
         dataroot="/home/tim/Research/tsgrasp/data/acronymvid"
         renderer=render_cfg()
         points_per_frame=45000
+        augmentations=augment_cfg()
+
     cfg = Cfg()
 
     tds = TrajectoryDataset(cfg, split="train")
 
-    print(tds[1])
+    print(tds[3])
 
     print("done")

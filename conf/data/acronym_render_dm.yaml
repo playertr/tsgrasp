@@ -14,6 +14,11 @@ data_cfg:
   frames_per_traj: 30  
   points_per_frame: 45000
 
+  augmentations:
+    add_random_jitter: True
+    random_jitter_sigma: 0.001
+    add_random_rotations: True    
+
   renderer:
     height: 300
     width: 300
