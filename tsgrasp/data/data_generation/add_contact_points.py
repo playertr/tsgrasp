@@ -29,6 +29,7 @@ def append_grasp_info(h5_path, mesh_root):
         obj_mesh = load_mesh(filename=h5_path, mesh_root_dir=mesh_root)
     except ValueError as e:
         print(e)
+        breakpoint()
         return False
 
     T, success = load_grasps(filename=h5_path)
@@ -37,9 +38,11 @@ def append_grasp_info(h5_path, mesh_root):
         contact_dicts = grasps_contact_info(grasp_tfs=T, successfuls=success, obj_mesh=obj_mesh, check_collisions=True)
     except AttributeError as e: # NoneType object has no attribute 'faces'
         print(e)
+        breakpoint()
         return False
     except RTreeError as e: # obscure, maybe memory-related error?
         print(e)
+        breakpoint()
         return False
 
     # `contact_dicts` is a list of dictionaries, with one dict per grasp.
@@ -90,6 +93,8 @@ def add_contact_points(cfg: DictConfig):
 
     ## DEBUG
     # h5_paths = h5_paths[:50]
+
+    # successes = [append_grasp(path) for path in tqdm(h5_paths)]
 
     with Pool(cfg.PROCESSES) as p:
         successes = list(

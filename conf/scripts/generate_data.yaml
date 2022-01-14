@@ -3,23 +3,24 @@
 PROCESSES : 20
 
 ## External dependency repos
-CONTACT_GRASPNET_REPO : /home/tim/Research/contact_graspnet_comp
-ACRONYM_REPO          : /home/tim/Research/acronym
+CONTACT_GRASPNET_REPO : /scratch/playert/contact_graspnet
+ACRONYM_REPO          : /scratch/playert/acronym
 
 ## Dataset directories
 ACRONYM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/acronym/grasps/
 SHAPENETSEM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/models-OBJ/
 
 SIMPLIFIED_MESH_DIR : ${hydra:runtime.cwd}/data/obj/
-OUTPUT_DATASET_DIR  : ${hydra:runtime.cwd}/data/dataset
+OUTPUT_DATASET_DIR  : ${hydra:runtime.cwd}/data/dataset2
 
 convert_meshes:
-  MANIFOLD_PATH : /home/tim/Research/Manifold/build/manifold
-  SIMPLIFY_PATH : /home/tim/Research/Manifold/build/simplify
+  MANIFOLD_PATH : /scratch/playert/Manifold/build/manifold
+  SIMPLIFY_PATH : /scratch/playert/Manifold/build/simplify
   MESH_DIR      : ${SHAPENETSEM_DIR}
   GRASP_DIR     : ${ACRONYM_DIR}
   OUTPUT_DIR    : ${SIMPLIFIED_MESH_DIR}
   PROCESSES     : ${PROCESSES}
+  BAD_MESH_JAIL : ${ACRONYM_DIR}/bad_mesh_jail/
 
 MESH_DIR              : ${hydra:runtime.cwd}/data/raw_datasets/models-OBJ/
 
@@ -28,7 +29,7 @@ add_contact_points:
   MESH_DIR      : ${SIMPLIFIED_MESH_DIR}
   CONTACT_GRASPNET_REPO : ${CONTACT_GRASPNET_REPO}
   ACRONYM_REPO          : ${ACRONYM_REPO}
-  PROCESSES             : ${PROCESSES}
+  PROCESSES             : 8
 
 ## Directory containing the .h5 files containing, for individual objects
 # - object-frame grasp info from ACRONYM
