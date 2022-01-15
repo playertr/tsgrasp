@@ -53,7 +53,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             return self.getitem(idx)
         except Exception as e:
             print(e)
-            print("Trying random index. Don't tell my advisor.")
+            print("Trying random index.")
             return self.getitem(np.random.randint(low=0, high=self.__len__()))
 
     def getitem(self, idx):
