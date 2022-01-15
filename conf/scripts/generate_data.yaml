@@ -10,8 +10,8 @@ ACRONYM_REPO          : /scratch/playert/acronym
 ACRONYM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/acronym/grasps/
 SHAPENETSEM_DIR : ${hydra:runtime.cwd}/data/raw_datasets/models-OBJ/
 
-SIMPLIFIED_MESH_DIR : ${hydra:runtime.cwd}/data/obj/
-OUTPUT_DATASET_DIR  : ${hydra:runtime.cwd}/data/dataset2
+SIMPLIFIED_MESH_DIR : ${hydra:runtime.cwd}/data/meshes/
+OUTPUT_DATASET_DIR  : ${hydra:runtime.cwd}/data/dataset/
 
 convert_meshes:
   MANIFOLD_PATH : /scratch/playert/Manifold/build/manifold
@@ -50,3 +50,5 @@ render_trajectories:
   TRAJ_PER_OBJECT : 3
   FRAMES_PER_TRAJ : 30
   PROCESSES       : ${PROCESSES}
+
+TRAIN_SPLIT : 0.8
