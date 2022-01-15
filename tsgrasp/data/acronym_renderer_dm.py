@@ -6,6 +6,7 @@ from omegaconf import DictConfig
 from tsgrasp.data.renderer import Renderer
 from tsgrasp.data.augmentations import RandomJitter, RandomRotation
 import trimesh
+import copy
 
 from tsgrasp.utils.utils import transform, compose
 
@@ -21,14 +22,16 @@ class TrajectoryDataset(torch.utils.data.Dataset):
 
     def __init__(self, cfg : DictConfig, split="train"):
         self.frames_per_traj = cfg.frames_per_traj
-        self.root = cfg.dataroot
-        self.renderer_cfg = cfg.renderer
+        self.root = os.path.join(cfg.dataroot, split)
         self.pts_per_frame = cfg.points_per_frame
+        self.renderer_cfg = copy.deepcopy(cfg.renderer)
+        self.renderer_cfg.mesh_dir = self.root
 
+        self.split = split
         # Find the raw filepaths.
         if split in ["train", "val", "test"]:
-            folder = os.path.join(self.root, split)
-            self._paths = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.h5')]
+            folder = os.path.join(self.root, "h5")
+            self._paths = [os.path.join(folder, f) for f in os.listdir(folder)]
         else:
             raise ValueError("Split %s not recognised" % split)
 
@@ -140,6 +143,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             "positions" : positions,
             "cam_frame_pos_grasp_tfs": cam_frame_pos_grasp_tfs,
             "pos_contact_pts_cam": pos_contact_pts_cam,
+            "idx": idx * torch.ones(1)
         }
         return self.augmentations(data)
 
@@ -279,8 +283,7 @@ if __name__ == "__main__":
     class render_cfg:
         height=300
         width=300
-        mesh_dir="/scratch/playert/workdir/tsgrasp/data/obj/"
-        acronym_repo="/scratch/playert/workdir/acronym"
+        acronym_repo="/home/tim/Research/acronym"
 
 
     @dataclass
@@ -292,7 +295,7 @@ if __name__ == "__main__":
     @dataclass
     class Cfg:
         frames_per_traj=4
-        dataroot="/scratch/playert/workdir/tsgrasp/data/dataset"
+        dataroot="/home/tim/Research/tsgrasp/data/dataset"
         renderer=render_cfg()
         points_per_frame=45000
         augmentations=augment_cfg()
@@ -300,6 +303,19 @@ if __name__ == "__main__":
     cfg = Cfg()
 
     tds = TrajectoryDataset(cfg, split="train")
+    tds2 = TrajectoryDataset(cfg, split="test")
+
+    from torch.utils.data import DataLoader
+    dl = DataLoader(tds, 
+        batch_size=3, 
+        num_workers=0, 
+        collate_fn=ragged_collate_fn, persistent_workers=False,
+        pin_memory=False, shuffle=True
+        # sampler=RandomSampler(self.dataset_train, 
+        #     num_samples=int(len(self.dataset_train)*self.data_cfg.data_proportion_per_epoch))
+        )
+
+    next(iter(dl))
 
     for i in range(60, len(tds)):
         item = tds[i]
