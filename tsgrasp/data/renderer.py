@@ -18,7 +18,8 @@ class Renderer:
 
         
         ## Dynamically import ACRONYM rendering utilities
-        sys.path.insert(0, cfg.acronym_repo) # :(
+        if cfg.acronym_repo not in sys.path[0]:
+            sys.path.insert(0, cfg.acronym_repo) # :(
         from acronym_tools import load_mesh
         from scripts.acronym_render_observations import SceneRenderer, PyrenderScene
         
