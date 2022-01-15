@@ -23,7 +23,7 @@ class LitTrajectoryDataset(pl.LightningDataModule):
         return DataLoader(self.dataset_train, 
         batch_size=self.batch_size, 
         num_workers=self.num_workers, 
-        collate_fn=ragged_collate_fn, persistent_workers=True,
+        collate_fn=ragged_collate_fn, persistent_workers=False,
         pin_memory=False
         # sampler=RandomSampler(self.dataset_train, 
         #     num_samples=int(len(self.dataset_train)*self.data_cfg.data_proportion_per_epoch))
