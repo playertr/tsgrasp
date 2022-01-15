@@ -279,8 +279,8 @@ if __name__ == "__main__":
     class render_cfg:
         height=300
         width=300
-        mesh_dir="/home/tim/Research/tsgrasp/data/obj/"
-        acronym_repo="/home/tim/Research/acronym"
+        mesh_dir="/scratch/playert/workdir/tsgrasp/data/obj/"
+        acronym_repo="/scratch/playert/workdir/acronym"
 
 
     @dataclass
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     @dataclass
     class Cfg:
         frames_per_traj=4
-        dataroot="/home/tim/Research/tsgrasp/data/acronymvid"
+        dataroot="/scratch/playert/workdir/tsgrasp/data/dataset"
         renderer=render_cfg()
         points_per_frame=45000
         augmentations=augment_cfg()
@@ -301,6 +301,9 @@ if __name__ == "__main__":
 
     tds = TrajectoryDataset(cfg, split="train")
 
-    print(tds[3])
+    for i in range(60, len(tds)):
+        item = tds[i]
+        print(i)
+
 
     print("done")
