@@ -6,7 +6,7 @@ defaults:
 
 data:
   data_cfg:
-    dataroot: /scratch/playert/tsgrasp/data/dataset
+    dataroot: /scratch/playert/workdir/tsgrasp/data/dataset
     points_per_frame: 45000
 
     num_workers: 8
@@ -15,7 +15,7 @@ data:
 
     renderer:
       mesh_dir: ${hydra:runtime.cwd}/data/obj/
-      acronym_repo: /scratch/playert/acronym
+      acronym_repo: /scratch/playert/workdir/acronym
     
     augmentations:
       add_random_jitter: True
