@@ -114,16 +114,17 @@ class LitTSGraspNet(pl.LightningModule):
             )
             
             ## Compute losses
+            # compute losses on only the very last frame
             add_s_loss_b, width_loss_b, class_loss_b = self.model.losses(
-                class_logits[b],
-                baseline_dir[b],
-                approach_dir[b],
-                grasp_offset[b],
-                positions[b],
-                grasp_tfs[b],
+                class_logits[b][-1].unsqueeze(0),
+                baseline_dir[b][-1].unsqueeze(0),
+                approach_dir[b][-1].unsqueeze(0),
+                grasp_offset[b][-1].unsqueeze(0),
+                positions[b][-1].unsqueeze(0),
+                grasp_tfs[b][-1].unsqueeze(0),
                 self.model.top_conf_quantile,
-                pt_labels_b,
-                width_labels_b
+                pt_labels_b[-1].unsqueeze(0),
+                width_labels_b[-1].unsqueeze(0)
             )  
 
             add_s_loss += add_s_loss_b / B
