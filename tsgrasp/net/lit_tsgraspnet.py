@@ -124,9 +124,10 @@ class LitTSGraspNet(pl.LightningModule):
                 grasp_tfs[b][-1].unsqueeze(0),
                 self.model.top_conf_quantile,
                 pt_labels_b[-1].unsqueeze(0),
-                width_labels_b[-1].unsqueeze(0)
-            )  
-
+                width_labels_b[-1].unsqueeze(0) if width_labels_b is not None else None
+            )
+            if width_labels_b is None: print("no width label")
+            
             add_s_loss += add_s_loss_b / B
             width_loss += width_loss_b / B
             class_loss += class_loss_b / B
