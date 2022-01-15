@@ -92,3 +92,11 @@ def multi_pointcloud_to_4d_coords(pcs):
 def discretize(positions: torch.Tensor, grid_size: float) -> torch.Tensor:
     """Truncate each position to an integer grid."""
     return (positions / grid_size).int()
+
+def unweighted_sum(coords: torch.Tensor):
+    """Create a feature vector from a coordinate array, so each 
+    row's feature is the number of rows that share that coordinate."""
+    
+    unique_coords, idcs, counts = coords.unique(dim=0, return_counts=True, return_inverse=True)
+    features = counts[idcs]
+    return features.reshape(-1, 1).to(torch.float32)

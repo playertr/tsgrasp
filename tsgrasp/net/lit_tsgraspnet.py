@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 import MinkowskiEngine as ME
-from tsgrasp.net.tsgraspnet import multi_pointcloud_to_4d_coords, discretize, TSGraspNet
+from tsgrasp.net.tsgraspnet import multi_pointcloud_to_4d_coords, discretize,TSGraspNet, unweighted_sum
 import torch.nn.functional as F
 
 class LitTSGraspNet(pl.LightningModule):
@@ -51,7 +51,8 @@ class LitTSGraspNet(pl.LightningModule):
         # Convert point positions into a Minkowski SparseTensor
         voxelized_pos = discretize(positions, grid_size=self.model.grid_size)
         coords = multi_pointcloud_to_4d_coords(voxelized_pos)
-        feats = torch.ones((len(coords), 1), device=coords.device)
+        feats = unweighted_sum(coords)
+        # feats = torch.ones((len(coords), 1), device=coords.device)
         stensor = ME.SparseTensor(
             coordinates = coords,
             features = feats
