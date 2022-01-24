@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 from tsgrasp.data.renderer import Renderer
-from tsgrasp.data.augmentations import RandomJitter, RandomRotation
+from tsgrasp.data.augmentations import RandomJitter, RandomRotation, RandomRotationAboutZ
 import trimesh
 import copy
 
@@ -43,6 +43,9 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         
         if cfg.augmentations.add_random_rotations:
             augmentations.append(RandomRotation())
+        
+        if cfg.augmentations.add_random_rotation_about_z:
+            augmentations.append(RandomRotationAboutZ())
 
         self.augmentations = compose(*augmentations)
 
