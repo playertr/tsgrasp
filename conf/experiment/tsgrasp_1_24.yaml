@@ -10,6 +10,8 @@ data:
     points_per_frame: 90000
 
     frames_per_traj: 1
+    min_pitch: 0.2617 # 15 degrees
+    max_pitch: 1.571 # 90 degrees
 
     renderer:
       mesh_dir: ${hydra:runtime.cwd}/data/obj/
