@@ -21,7 +21,7 @@ data:
       add_random_rotations: False
 
 training:
-  batch_size: 3
+  batch_size: 16
   gpus: 4
 
   use_wandb: False
