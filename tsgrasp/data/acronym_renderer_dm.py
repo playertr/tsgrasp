@@ -81,6 +81,10 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         depth_ims = renderer.render_trajectory(trajectory)
 
         pcs = [depth_to_pointcloud(d) for d in depth_ims]
+        
+        if any(pc.shape[-1] != self.pts_per_frame for pc in pcs):
+            raise ValueError("Not enough valid points rendered.")
+
         for i in range(len(pcs)):
             idxs = torch.randperm(len(pcs[i]), dtype=torch.int32, device='cpu')[:self.pts_per_frame].sort()[0].long()
             pcs[i] = pcs[i][idxs]
