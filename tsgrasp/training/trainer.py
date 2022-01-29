@@ -8,6 +8,8 @@ import wandb
 from omegaconf import OmegaConf
 
 from hydra.utils import instantiate
+import torch
+torch.backends.cudnn.benchmark = True
 
 class Trainer:
     def __init__(self, cfg : DictConfig):
