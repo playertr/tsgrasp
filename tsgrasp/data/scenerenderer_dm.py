@@ -5,10 +5,11 @@ import torch
 from omegaconf import DictConfig
 # import trimesh
 # import copy
-from contact_graspnet.data import load_scene_contacts, PointCloudReader
 
 import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
+
+from contact_graspnet.data import load_scene_contacts, PointCloudReader
 
 # from tsgrasp.utils.utils import transform, compose
 
