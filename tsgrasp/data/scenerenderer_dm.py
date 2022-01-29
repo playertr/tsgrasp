@@ -1,10 +1,10 @@
 import os
-from shutil import ExecError
 import numpy as np
 import torch
 from omegaconf import DictConfig
-# import trimesh
+import trimesh
 # import copy
+import pickle
 
 import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
@@ -29,8 +29,8 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         self.pts_per_frame = cfg.points_per_frame
         # self.renderer_cfg = copy.deepcopy(cfg.renderer)
         # self.renderer_cfg.mesh_dir = self.root
-        # self.min_pitch = cfg.min_pitch
-        # self.max_pitch = cfg.max_pitch
+        self.min_pitch = cfg.min_pitch
+        self.max_pitch = cfg.max_pitch
         self.split = split
 
         # # Find the raw filepaths.
@@ -40,8 +40,16 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         # else:
         #     raise ValueError("Split %s not recognised" % split)
 
-        self.contact_infos = load_scene_contacts(
-            dataset_folder=cfg.dataroot, scene_contacts_path=cfg.scene_contacts_path)
+        # loading from npz is slow, so we memoize with Pickle
+        contact_infos_file = os.path.join(cfg.dataroot, 'contact_infos.pkl')
+        if os.path.exists(contact_infos_file):
+            with open(contact_infos_file, 'rb') as f:
+                self.contact_infos = pickle.load(f)
+        else:
+            self.contact_infos = load_scene_contacts(
+                dataset_folder=cfg.dataroot, scene_contacts_path=cfg.scene_contacts_path)
+            with open(contact_infos_file, 'wb') as f:
+                pickle.dump(self.contact_infos, f, pickle.HIGHEST_PROTOCOL)
 
         self.pcreader = PointCloudReader(
             root_folder=cfg.dataroot,
@@ -87,36 +95,109 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             min_pitch=self.min_pitch, 
             max_pitch=self.max_pitch)
 
-        pts, cam_poses, scene_idx = self.pcreader.get_scene_batch(scene_idx=idx)
+        pts, cam_poses, scene_idx = self.pcreader.get_scene_batch_with_poses(
+            scene_idx=idx, 
+            cam_poses=cam_poses)
 
         cam_poses[..., :3, 1:3] *= -1 # convert from trimesh camera coord reference by flipping Y and Z axes
         tf_obj_to_cam = np.linalg.inv(cam_poses)
+        tf_obj_to_cam = np.expand_dims(tf_obj_to_cam, 1)
+
         cam_frame_pos_grasp_tfs = tf_obj_to_cam @ self.contact_infos[idx]['grasp_transforms']
 
         cp = self.contact_infos[idx]['scene_contact_points']
         cp = np.concatenate([cp, np.ones((*cp.shape[:-1], 1))], axis=-1)
-        pos_contact_pts_cam = (tf_obj_to_cam @ cp.reshape(-1, 4, 1)).reshape(-1, 2, 4)[...,:3]
-
+        pos_contact_pts_cam = (tf_obj_to_cam @ cp.reshape(-1, 4, 1)).reshape(
+            len(tf_obj_to_cam), -1, 2, 4)[...,:3]
 
         # from tsgrasp.utils.viz.viz import draw_grasps
         # positions = torch.Tensor(pts)
         # cam_frame_pos_grasp_tfs = torch.Tensor(cam_frame_pos_grasp_tfs)
-        # # draw_grasps(pts=positions[0], grasp_tfs=[], confs=[1])
-        # tfs = torch.stack([t[:50] for t in cam_frame_pos_grasp_tfs])
+        # tfs = cam_frame_pos_grasp_tfs[0]
         # all_pos = positions.reshape(-1, 3)
-        # tfs = tfs.reshape(-1, 4, 4)
         # # draw_grasps(all_pos, tfs, confs=[1]*len(tfs))
-        # draw_grasps(pos_contact_pts_cam.reshape(-1, 3), tfs[::16], confs=[1]*len(tfs[::16]))
-        # draw_grasps(pos_contact_pts_cam[:, 1], tfs[::16], confs=[1]*len(tfs)[::16])
-        
+        # draw_grasps(pos_contact_pts_cam[0].reshape(-1, 3), tfs[::16], confs=[1]*len(tfs[::16]))
+        # draw_grasps(pos_contact_pts_cam[0][:, 1], tfs[::16], confs=[1]*len(tfs)[::16])
 
         data = {
             "positions" : torch.Tensor(pts),
-            "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs).unsqueeze(0),
-            "pos_contact_pts_cam": torch.Tensor(pos_contact_pts_cam).unsqueeze(0),
+            "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
+            "pos_contact_pts_cam": torch.Tensor(pos_contact_pts_cam),
         }
         return data
         
+    @staticmethod
+    def make_trajectory(obj_loc: np.ndarray, num_frames : float, min_pitch: float, max_pitch: int, seed=None):
+        """Create a "random" trajectory that views the object.
+        Initially, these trajectories will be circular orbits that always look directly at the object, at different elevation angles.
+
+        A trajectory consists of camera poses in the object frame, i.e., 4x4 transforms which map from the camera coordinates to object coordinates. The camera coordinate system is defined with +X right, +Y down, +Z out and towards the scene (z > 0 for visible points).
+
+        More creative distributions of trajectories, including ones in which
+        the image-frame object center is not in the middle of the path, are 
+        future work.
+
+        Args:
+            obj_loc (np.ndarray): location of the object. Origin? Center? Not sure.
+            num_frames (int): number of positions along trajectory
+            min_pitch (float): minimum pitch angle for uniform dist
+            max pitch (float): max pitch angle for uniform dist
+            seed (int, optional): RNG seed. Defaults to None.
+
+        Returns:
+            np.ndarray: array of 4x4 poses
+        """
+        
+        np.random.seed(seed)
+
+        # The pitch angle is a uniform random angle
+        pitch = np.random.uniform(min_pitch, max_pitch)
+        
+        # A full circle is swept out, with a random initial yaw angle.
+        yaw0 = np.random.uniform(0, 2*np.pi)
+        
+        d0 = np.random.uniform(1.5, 2.5) # Orbital distance
+        
+        yaws = np.linspace(yaw0, yaw0+2*np.pi * num_frames/30, num_frames)
+        ds = d0 * np.ones_like(yaws)
+        poses = []
+
+        for i, (yaw, d) in enumerate(zip(yaws, ds)):
+            camera_pose = look_at(
+                loc=obj_loc,
+                rotation=trimesh.transformations.euler_matrix(
+                    pitch,
+                    0,
+                    yaw,
+                ),
+                distance=d,
+            )
+            poses.append(camera_pose)
+        return np.array(poses)
+
+def look_at(loc: np.ndarray, rotation: np.ndarray, distance: float) -> np.ndarray:
+    """Generate transform for a camera to keep a point in the camera's field of view. This is trimesh.scene.cameras.Camera.look_at, and it uses the pyrender convention for z-axis.
+
+    NB! This function assumes the camera looks along its -z axis.
+
+    Args:
+        loc (np.ndarray): (3,) point to look at
+        rotation (np.ndarray): (4,4) Rotation matrix for initial rotation
+        distance (float): Distance from camera to point
+
+    Returns:
+        np.ndarray: (4,4) camera pose in world frame (tf world<--cam)
+    """
+    cam_pose = np.eye(4)
+    cam_pose[:3, :3] = rotation[:3, :3]
+    focal_axis = rotation[:3,2] # + z axis. Should be a unit vector.
+    
+    assert np.abs(1 - np.linalg.norm(focal_axis)) < 0.001, "Rotation not orthonormal"
+
+    pos = loc + distance * focal_axis
+    cam_pose[:3, 3] = pos
+
+    return cam_pose
 
         # path = self._paths[idx]
         # with h5py.File(path) as ds:
@@ -206,82 +287,13 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         # }
         # return self.augmentations(data)
 
-#     @staticmethod
-#     def make_trajectory(obj_loc: np.ndarray, num_frames : float, min_pitch: float, max_pitch: int, seed=None):
-#         """Create a "random" trajectory that views the object.
-#         Initially, these trajectories will be circular orbits that always look directly at the object, at different elevation angles.
-
-#         A trajectory consists of camera poses in the object frame, i.e., 4x4 transforms which map from the camera coordinates to object coordinates. The camera coordinate system is defined with +X right, +Y down, +Z out and towards the scene (z > 0 for visible points).
-
-#         More creative distributions of trajectories, including ones in which
-#         the image-frame object center is not in the middle of the path, are 
-#         future work.
-
-#         Args:
-#             obj_loc (np.ndarray): location of the object. Origin? Center? Not sure.
-#             num_frames (int): number of positions along trajectory
-#             min_pitch (float): minimum pitch angle for uniform dist
-#             max pitch (float): max pitch angle for uniform dist
-#             seed (int, optional): RNG seed. Defaults to None.
-
-#         Returns:
-#             np.ndarray: array of 4x4 poses
-#         """
-        
-#         np.random.seed(seed)
-
-#         # The pitch angle is a uniform random angle
-#         pitch = np.random.uniform(min_pitch, max_pitch)
-        
-#         # A full circle is swept out, with a random initial yaw angle.
-#         yaw0 = np.random.uniform(0, 2*np.pi)
-        
-#         d0 = np.random.uniform(1.5, 2.5) # Orbital distance
-        
-#         yaws = np.linspace(yaw0, yaw0+2*np.pi * num_frames/30, num_frames)
-#         ds = d0 * np.ones_like(yaws)
-#         poses = []
-
-#         for i, (yaw, d) in enumerate(zip(yaws, ds)):
-#             camera_pose = look_at(
-#                 loc=obj_loc,
-#                 rotation=trimesh.transformations.euler_matrix(
-#                     pitch,
-#                     0,
-#                     yaw,
-#                 ),
-#                 distance=d,
-#             )
-#             poses.append(camera_pose)
-#         return np.array(poses)
+    
         
 #     @property
 #     def raw_dir(self):
 #         return self.root
 
-# def look_at(loc: np.ndarray, rotation: np.ndarray, distance: float) -> np.ndarray:
-#     """Generate transform for a camera to keep a point in the camera's field of view. This is trimesh.scene.cameras.Camera.look_at, and it uses the pyrender convention for z-axis.
 
-#     NB! This function assumes the camera looks along its -z axis.
-
-#     Args:
-#         loc (np.ndarray): (3,) point to look at
-#         rotation (np.ndarray): (4,4) Rotation matrix for initial rotation
-#         distance (float): Distance from camera to point
-
-#     Returns:
-#         np.ndarray: (4,4) camera pose in world frame (tf world<--cam)
-#     """
-#     cam_pose = np.eye(4)
-#     cam_pose[:3, :3] = rotation[:3, :3]
-#     focal_axis = rotation[:3,2] # + z axis. Should be a unit vector.
-    
-#     assert np.abs(1 - np.linalg.norm(focal_axis)) < 0.001, "Rotation not orthonormal"
-
-#     pos = loc + distance * focal_axis
-#     cam_pose[:3, 3] = pos
-
-#     return cam_pose
 
 def ragged_collate_fn(list_data):
     """Attempt to stack up each tensor in the dictionary. If they have incompatible sizes, return a list. """

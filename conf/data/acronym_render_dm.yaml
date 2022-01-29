@@ -11,8 +11,10 @@ data_cfg:
 
   # dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
   dataroot: ${hydra:runtime.cwd}/data/dataset
-  frames_per_traj: 30  
+  frames_per_traj: 4  
   points_per_frame: 45000
+  min_pitch: 0.0 # 0 degrees (looking straight down)
+    max_pitch: 1.222 # 70 degrees
 
   augmentations:
     add_random_jitter: True
