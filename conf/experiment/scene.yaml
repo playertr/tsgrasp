@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /model: tsgraspnet
+  - override /data: scene_renderer_dm
+
+data:
+  data_cfg:
+    dataroot: /scratch/playert/workdir/cgn_data
+    num_workers: 0
+    points_per_frame: 45000
+
+training:
+  batch_size: 32
+  gpus: 1
+
+  use_wandb: False
+  wandb:
+    project: "TSGrasp"
+    experiment: "tsgrasp_scene"
+    notes: "First run attempting table scene data."

@@ -3,6 +3,8 @@
 
 import torch
 from tsgrasp.utils.utils import transform_unbatched
+import numpy as np
+import trimesh.transformations
 
 class RandomJitter:
     """Add Guassian noise to `position` coordinates."""
@@ -22,6 +24,24 @@ class RandomRotation:
         # https://math.stackexchange.com/questions/442418/random-generation-of-rotation-matrices
         randrot, _R = torch.linalg.qr(torch.randn(3,3))
         tf[:3,:3] = randrot
+
+        data['positions'] = transform_unbatched(data['positions'], tf)
+        data['cam_frame_pos_grasp_tfs'] = transform_unbatched(
+            data["cam_frame_pos_grasp_tfs"], tf)
+        data["pos_contact_pts_cam"] = transform_unbatched(data["pos_contact_pts_cam"], tf)
+        return data
+
+class RandomRotationAboutZ:
+    """Randomly yaw all spatial inputs about Z axis (preserving depth)."""
+
+    def __call__(self, data: dict):
+        yaw = np.random.uniform(0, 2*np.pi)
+        tf = trimesh.transformations.euler_matrix(
+            0,
+            0,
+            yaw,
+        )
+        tf = torch.Tensor(tf)
 
         data['positions'] = transform_unbatched(data['positions'], tf)
         data['cam_frame_pos_grasp_tfs'] = transform_unbatched(

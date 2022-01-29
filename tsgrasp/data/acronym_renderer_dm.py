@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 from tsgrasp.data.renderer import Renderer
-from tsgrasp.data.augmentations import RandomJitter, RandomRotation
+from tsgrasp.data.augmentations import RandomJitter, RandomRotation, RandomRotationAboutZ
 import trimesh
 import copy
 
@@ -26,6 +26,8 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         self.pts_per_frame = cfg.points_per_frame
         self.renderer_cfg = copy.deepcopy(cfg.renderer)
         self.renderer_cfg.mesh_dir = self.root
+        self.min_pitch = cfg.min_pitch
+        self.max_pitch = cfg.max_pitch
 
         self.split = split
         # Find the raw filepaths.
@@ -41,6 +43,9 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         
         if cfg.augmentations.add_random_rotations:
             augmentations.append(RandomRotation())
+        
+        if cfg.augmentations.add_random_rotation_about_z:
+            augmentations.append(RandomRotationAboutZ())
 
         self.augmentations = compose(*augmentations)
 
@@ -72,10 +77,14 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         obj_pose = np.eye(4)
         renderer = Renderer(h5_path=path, obj_pose=obj_pose, cfg=self.renderer_cfg)
         
-        trajectory = self.make_trajectory(renderer.obj_pose[:3,3], num_frames=self.frames_per_traj)
+        trajectory = self.make_trajectory(renderer.obj_pose[:3,3], num_frames=self.frames_per_traj, min_pitch=self.min_pitch, max_pitch=self.max_pitch)
         depth_ims = renderer.render_trajectory(trajectory)
 
         pcs = [depth_to_pointcloud(d) for d in depth_ims]
+
+        if any(pc.shape[-2] != self.pts_per_frame for pc in pcs):
+            raise ValueError("Not enough valid points rendered.")
+
         for i in range(len(pcs)):
             idxs = torch.randperm(len(pcs[i]), dtype=torch.int32, device='cpu')[:self.pts_per_frame].sort()[0].long()
             pcs[i] = pcs[i][idxs]
@@ -148,7 +157,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         return self.augmentations(data)
 
     @staticmethod
-    def make_trajectory(obj_loc: np.ndarray, num_frames : int, seed=None):
+    def make_trajectory(obj_loc: np.ndarray, num_frames : float, min_pitch: float, max_pitch: int, seed=None):
         """Create a "random" trajectory that views the object.
         Initially, these trajectories will be circular orbits that always look directly at the object, at different elevation angles.
 
@@ -161,6 +170,8 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         Args:
             obj_loc (np.ndarray): location of the object. Origin? Center? Not sure.
             num_frames (int): number of positions along trajectory
+            min_pitch (float): minimum pitch angle for uniform dist
+            max pitch (float): max pitch angle for uniform dist
             seed (int, optional): RNG seed. Defaults to None.
 
         Returns:
@@ -169,10 +180,8 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         
         np.random.seed(seed)
 
-        # The pitch angle is a uniform random angle 
-        avg_pitch = np.pi/3
-        pitch_range = 0.16 # roughly 10 degrees
-        pitch = np.random.uniform(avg_pitch-pitch_range/2, avg_pitch+pitch_range/2)
+        # The pitch angle is a uniform random angle
+        pitch = np.random.uniform(min_pitch, max_pitch)
         
         # A full circle is swept out, with a random initial yaw angle.
         yaw0 = np.random.uniform(0, 2*np.pi)
