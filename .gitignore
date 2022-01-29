@@ -10,3 +10,6 @@ ckpts/
 *.pickle
 *.png
 *.csv
+*.h5
+*.tar.gz
+*.ckpt
