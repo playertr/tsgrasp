@@ -11,7 +11,7 @@ os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
 
 from contact_graspnet.data import load_scene_contacts, PointCloudReader
 
-# from tsgrasp.utils.utils import transform, compose
+from tsgrasp.utils.utils import transform #, compose
 
 class TrajectoryDataset(torch.utils.data.Dataset):
     """
@@ -110,6 +110,29 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         pos_contact_pts_cam = (tf_obj_to_cam @ cp.reshape(-1, 4, 1)).reshape(
             len(tf_obj_to_cam), -1, 2, 4)[...,:3]
 
+        positions = torch.Tensor(pts)
+        cam_frame_pos_grasp_tfs = torch.Tensor(cam_frame_pos_grasp_tfs)
+        pos_contact_pts_cam = torch.Tensor(pos_contact_pts_cam)
+
+        ## Transform all "camera" frame poses to be, specifically, in the frame of the most recent camera perspective.
+        # Hopefully float precision ought to do ...
+        tf_obj_to_cam = tf_obj_to_cam.squeeze(1)
+        tf_from_cam_i_to_cam_N = torch.Tensor(
+            tf_obj_to_cam[-1] @ np.stack([inverse_homo(tf) for tf in tf_obj_to_cam])
+        )
+        positions = transform(
+            positions, 
+            tf_from_cam_i_to_cam_N
+        )
+        cam_frame_pos_grasp_tfs = transform(
+            cam_frame_pos_grasp_tfs,
+            tf_from_cam_i_to_cam_N
+        )
+        pos_contact_pts_cam = transform(
+            pos_contact_pts_cam,
+            tf_from_cam_i_to_cam_N
+        )
+
         # from tsgrasp.utils.viz.viz import draw_grasps
         # positions = torch.Tensor(pts)
         # cam_frame_pos_grasp_tfs = torch.Tensor(cam_frame_pos_grasp_tfs)
@@ -120,9 +143,9 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         # draw_grasps(pos_contact_pts_cam[0][:, 1], tfs[::16], confs=[1]*len(tfs)[::16])
 
         data = {
-            "positions" : torch.Tensor(pts),
-            "cam_frame_pos_grasp_tfs": torch.Tensor(cam_frame_pos_grasp_tfs),
-            "pos_contact_pts_cam": torch.Tensor(pos_contact_pts_cam),
+            "positions" : positions,
+            "cam_frame_pos_grasp_tfs": cam_frame_pos_grasp_tfs,
+            "pos_contact_pts_cam": pos_contact_pts_cam,
         }
         return data
         
@@ -333,19 +356,19 @@ def ragged_collate_fn(list_data):
 
 #     return np.vstack((world_x, world_y, world_z)).T
 
-# def inverse_homo(tf):
-#     """Compute inverse of homogeneous transformation matrix.
+def inverse_homo(tf):
+    """Compute inverse of homogeneous transformation matrix.
 
-#     The matrix should have entries
-#     [[R,       Rt]
-#      [0, 0, 0, 1]].
-#     """
-#     R = tf[0:3, 0:3]
-#     t = R.T @ tf[0:3, 3].reshape(3, 1)
-#     return np.block([
-#         [R.T, -t],
-#         [0, 0, 0, 1]
-#     ])
+    The matrix should have entries
+    [[R,       Rt]
+     [0, 0, 0, 1]].
+    """
+    R = tf[0:3, 0:3]
+    t = R.T @ tf[0:3, 3].reshape(3, 1)
+    return np.block([
+        [R.T, -t],
+        [0, 0, 0, 1]
+    ])
 
 # if __name__ == "__main__":
 #     from dataclasses import dataclass
