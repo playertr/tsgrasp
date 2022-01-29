@@ -7,6 +7,9 @@ from omegaconf import DictConfig
 # import copy
 from contact_graspnet.data import load_scene_contacts, PointCloudReader
 
+import os
+os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
+
 # from tsgrasp.utils.utils import transform, compose
 
 class TrajectoryDataset(torch.utils.data.Dataset):
@@ -76,6 +79,12 @@ class TrajectoryDataset(torch.utils.data.Dataset):
     def _getitem(self, idx):
 
         """Generate a random trajectory using the grasp information in this .h5 file."""
+
+        cam_poses = self.make_trajectory(
+            np.zeros(3,), 
+            num_frames=self.frames_per_traj, 
+            min_pitch=self.min_pitch, 
+            max_pitch=self.max_pitch)
 
         pts, cam_poses, scene_idx = self.pcreader.get_scene_batch(scene_idx=idx)
 
