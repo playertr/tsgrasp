@@ -2,8 +2,8 @@
 # class for rendering trajectories for training and testing
 
 from dataclasses import dataclass
-import os
-os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
+# import os
+# os.environ['PYOPENGL_PLATFORM'] = 'egl' # for headless
 
 import pyrender
 import numpy as np

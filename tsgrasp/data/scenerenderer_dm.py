@@ -44,7 +44,11 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         contact_infos_file = os.path.join(cfg.dataroot, 'contact_infos.pkl')
         if os.path.exists(contact_infos_file):
             with open(contact_infos_file, 'rb') as f:
-                self.contact_infos = pickle.load(f)
+                try:
+                    self.contact_infos = pickle.load(f)
+                except ValueError:
+                    import pickle5 # older versions of pickle don't work
+                    self.contact_infos = pickle5.load(f)
         else:
             self.contact_infos = load_scene_contacts(
                 dataset_folder=cfg.dataroot, scene_contacts_path=cfg.scene_contacts_path)
@@ -88,12 +92,14 @@ class TrajectoryDataset(torch.utils.data.Dataset):
     def _getitem(self, idx):
 
         """Generate a random trajectory using the grasp information in this .h5 file."""
+        seed = None if self.split == "train" else idx
 
         cam_poses = self.make_trajectory(
             np.zeros(3,), 
             num_frames=self.frames_per_traj, 
             min_pitch=self.min_pitch, 
-            max_pitch=self.max_pitch)
+            max_pitch=self.max_pitch,
+            seed=seed)
 
         pts, cam_poses, scene_idx = self.pcreader.get_scene_batch_with_poses(
             scene_idx=idx, 

@@ -27,6 +27,9 @@ def visualize_grasps(ds, cfg):
         grasp_offset = torch.Tensor(results['grasp_offset']).to(device)
         pts = torch.Tensor(results['positions']).to(device)
 
+        if class_logits.shape[-1] != 1:
+            class_logits = class_logits.unsqueeze(-1)
+            grasp_offset = grasp_offset.unsqueeze(-1)
         outputs = (
             class_logits.unsqueeze(0), 
             baseline_dir.unsqueeze(0), 

@@ -1,8 +1,10 @@
 
-LOCAL_INTERACTIVE_DEBUG = False
-if not LOCAL_INTERACTIVE_DEBUG:
-    import pyglet
-    pyglet.options['headless'] = True
+
+import os
+LOCAL_INTERACTIVE_DEBUG = True
+# if not LOCAL_INTERACTIVE_DEBUG:
+#     # import pyglet
+    # pyglet.options['headless'] = True
 
 import torch
 import pytorch_lightning as pl
@@ -14,7 +16,6 @@ import io
 import numpy as np
 from tsgrasp.net.minkowski_graspnet import build_6dof_grasps
 import imageio
-import os
 
 class GraspAnimationLogger(Callback):
     def __init__(self, cfg, example_batch: dict):
@@ -136,7 +137,7 @@ def draw_grasps(pts, grasp_tfs, confs, pitch=0.55*2*np.pi, res=(1080, 1080)):
     )
     scene.camera_transform = cam_pose
     if LOCAL_INTERACTIVE_DEBUG: scene.show(viewer='gl')
-    data = scene.save_image(resolution=res, visible=False) 
+    data = scene.save_image(resolution=res, visible=True) 
     im = Image.open(io.BytesIO(data))
     return np.asarray(im)
 

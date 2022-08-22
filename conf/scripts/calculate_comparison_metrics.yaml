@@ -4,26 +4,27 @@
 # ctn_output_path: ???
 
 gpus: 1
-success_radius: 0.02
+success_radius: 0.005
 
 
-tsgrasp_output_name: tsgraspnet_11_17
-ctn_output_name: tsgraspnet_11_17
+tsgrasp_output_name: tsgrasp_scene_4
+ctn_output_name: contact_graspnet_outputs
 test_run: True
 
 # test_run: False
 # tsgrasp_output_name: tsgraspnet_11_17
 # ctn_output_name: tsgraspnet_11_17
 
-output_dir: ${hydra:runtime.cwd}/experiments
+output_dir: ${hydra:runtime.cwd}/experiments/
 
 tsgrasp_output_path: ${output_dir}/${tsgrasp_output_name}.h5
 ctn_output_path: ${output_dir}/${ctn_output_name}.h5
 
-tsgrasp_sc_csv_path: ${output_dir}/${tsgrasp_output_name}_sc.csv
-ctn_sc_csv_path: ${output_dir}/${ctn_output_name}_sc.csv
-tsgrasp_pr_csv_path: ${output_dir}/${tsgrasp_output_name}_pr.csv
-ctn_pr_csv_path: ${output_dir}/${ctn_output_name}_pr.csv
+new_output_dir: ${hydra:runtime.cwd}/experiments/${tsgrasp_output_name}-${ctn_output_name}/
+tsgrasp_sc_csv_path: ${new_output_dir}/${tsgrasp_output_name}_sc.csv
+ctn_sc_csv_path: ${new_output_dir}/${ctn_output_name}_sc.csv
+tsgrasp_pr_csv_path: ${new_output_dir}/${tsgrasp_output_name}_pr.csv
+ctn_pr_csv_path: ${new_output_dir}/${ctn_output_name}_pr.csv
 
-sc_png_path: ${output_dir}/${tsgrasp_output_name}_sc.png
-pr_png_path: ${output_dir}/${tsgrasp_output_name}_pr.png
+sc_png_path: ${new_output_dir}/${tsgrasp_output_name}_sc.png
+pr_png_path: ${new_output_dir}/${tsgrasp_output_name}_pr.png

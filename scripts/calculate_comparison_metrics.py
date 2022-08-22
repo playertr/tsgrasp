@@ -1,3 +1,4 @@
+from bdb import Breakpoint
 import hydra
 from omegaconf import DictConfig
 import h5py
@@ -12,10 +13,12 @@ import pandas as pd
 
 @hydra.main(config_path="../conf", config_name="scripts/calculate_comparison_metrics")
 def main(cfg : DictConfig):
+    os.makedirs(os.path.dirname(cfg.new_output_dir), exist_ok=True)
     with h5py.File(cfg.tsgrasp_output_path, 'r') as ts_ds:
         with h5py.File(cfg.ctn_output_path, 'r') as ctn_ds:
             s_c_curves = make_s_c_curves(ts_ds, ctn_ds, cfg)
 
+@torch.no_grad()
 def make_s_c_curves(ts_ds, ctn_ds, cfg):
 
     ts_curves = []
@@ -42,76 +45,78 @@ def make_s_c_curves(ts_ds, ctn_ds, cfg):
         ctn_gt_contact_pts = torch.Tensor(ctn_results['gt_contact_pts']).to(device)
         ctn_labels = torch.Tensor(ctn_results['pt_labels']).to(device)
 
+        T, _45000, _1 = ts_confs.shape
+        for t in tqdm(range(T)):
         ## Make success-coverage curves
-        ts_curves.append(
-            framewise_sc_curve(ts_confs, ts_pos, ts_labels, ts_gt_contact_pts, radius=cfg.success_radius)
-        )
-        ctn_curves.append(
-            framewise_sc_curve(ctn_confs, ctn_pos, ctn_labels, ctn_gt_contact_pts, radius=cfg.success_radius)
-        )
+            ts_curves.append(
+                framewise_sc_curve(ts_confs[t].unsqueeze(0), ts_pos[t].unsqueeze(0), ts_labels[t].unsqueeze(0), ts_gt_contact_pts[t].unsqueeze(0), radius=cfg.success_radius)
+            )
+        # ctn_curves.append(
+        #     framewise_sc_curve(ctn_confs, ctn_pos, ctn_labels, ctn_gt_contact_pts, radius=cfg.success_radius)
+        # )
 
         ## Make precision-recall curves
         ts_pr_curves.append(
-            precision_recall_curve(ts_confs, ts_labels)
+            precision_recall_curve(ts_confs[t].unsqueeze(0), ts_labels[t].unsqueeze(0))
         )
-        ctn_pr_curves.append(
-            precision_recall_curve(ctn_confs, ctn_labels)
-        )
+        # ctn_pr_curves.append(
+        #     precision_recall_curve(ctn_confs, ctn_labels)
+        # )
 
-    ## Concatenate the outputs from every example and compute aggregated curves
-    # Success-coverage curves
-    examples = range(len(ts_curves))
-    ts_curves = pd.concat(ts_curves, keys=[f"ex_{ex}" for ex in examples])
-    ts_curve_gb = ts_curves.groupby('confidence') # DataFrameGroupBy object
-    ts_curve = pd.DataFrame()
-    ts_curve['success'] = ts_curve_gb['n_correctly_pred_positive'].sum() / ts_curve_gb['n_pred_positive'].sum()
-    ts_curve['coverage'] = ts_curve_gb['n_covered_gt_points'].sum() / ts_curve_gb['n_gt_points'].sum()
+        ## Concatenate the outputs from every example and compute aggregated curves
+        # Success-coverage curves
+        examples = range(len(ts_curves))
+        ts_curves_df = pd.concat(ts_curves, keys=[f"ex_{ex}" for ex in examples])
+        ts_curve_gb = ts_curves_df.groupby('confidence') # DataFrameGroupBy object
+        ts_curve = pd.DataFrame()
+        ts_curve['success'] = ts_curve_gb['n_correctly_pred_positive'].sum() / ts_curve_gb['n_pred_positive'].sum()
+        ts_curve['coverage'] = ts_curve_gb['n_covered_gt_points'].sum() / ts_curve_gb['n_gt_points'].sum()
 
-    ctn_curves = pd.concat(ctn_curves, keys=[f"ex_{ex}" for ex in examples])
-    ctn_curve_gb = ctn_curves.groupby('confidence') # DataFrameGroupBy object
-    ctn_curve = pd.DataFrame()
-    ctn_curve['success'] = ctn_curve_gb['n_correctly_pred_positive'].sum() / ctn_curve_gb['n_pred_positive'].sum()
-    ctn_curve['coverage'] = ctn_curve_gb['n_covered_gt_points'].sum() / ctn_curve_gb['n_gt_points'].sum()
-
-
-    # Precision-recall curves
-    ts_pr_curves = pd.concat(ts_pr_curves, keys=[f"ex_{ex}" for ex in examples])
-    ts_pr_curve_gb = ts_pr_curves.groupby('confidence') # DataFrameGroupBy object
-    ts_pr_curve = pd.DataFrame()
-    ts_pr_curve['precision'] = ts_pr_curve_gb['n_correctly_pred_positive'].sum() / ts_pr_curve_gb['n_pred_positive'].sum()
-    ts_pr_curve['recall'] = ts_pr_curve_gb['n_correctly_pred_positive'].sum() / ts_pr_curve_gb['n_actual_positive'].sum()
+        # ctn_curves_df = pd.concat(ctn_curves, keys=[f"ex_{ex}" for ex in examples])
+        # ctn_curve_gb = ctn_curves_df.groupby('confidence') # DataFrameGroupBy object
+        # ctn_curve = pd.DataFrame()
+        # ctn_curve['success'] = ctn_curve_gb['n_correctly_pred_positive'].sum() / ctn_curve_gb['n_pred_positive'].sum()
+        # ctn_curve['coverage'] = ctn_curve_gb['n_covered_gt_points'].sum() / ctn_curve_gb['n_gt_points'].sum()
 
 
-    ctn_pr_curves = pd.concat(ctn_pr_curves, keys=[f"ex_{ex}" for ex in examples])
-    ctn_pr_curve_gb = ctn_pr_curves.groupby('confidence') # DataFrameGroupBy object
-    ctn_pr_curve = pd.DataFrame()
-    ctn_pr_curve['precision'] = ctn_pr_curve_gb['n_correctly_pred_positive'].sum() / ctn_pr_curve_gb['n_pred_positive'].sum()
-    ctn_pr_curve['recall'] = ctn_pr_curve_gb['n_correctly_pred_positive'].sum() / ctn_pr_curve_gb['n_actual_positive'].sum()
+        # Precision-recall curves
+        ts_pr_curves_df = pd.concat(ts_pr_curves, keys=[f"ex_{ex}" for ex in examples])
+        ts_pr_curve_gb = ts_pr_curves_df.groupby('confidence') # DataFrameGroupBy object
+        ts_pr_curve = pd.DataFrame()
+        ts_pr_curve['precision'] = ts_pr_curve_gb['n_correctly_pred_positive'].sum() / ts_pr_curve_gb['n_pred_positive'].sum()
+        ts_pr_curve['recall'] = ts_pr_curve_gb['n_correctly_pred_positive'].sum() / ts_pr_curve_gb['n_actual_positive'].sum()
 
-    ## Write dataframes to disk
-    # Success-coverage curves
-    ts_curves.to_csv(cfg.tsgrasp_sc_csv_path)
-    ctn_curves.to_csv(cfg.ctn_sc_csv_path)
 
-    # Precision-recall curves
-    ts_pr_curves.to_csv(cfg.tsgrasp_pr_csv_path)
-    ctn_pr_curves.to_csv(cfg.ctn_pr_csv_path)
+        # ctn_pr_curves_df = pd.concat(ctn_pr_curves, keys=[f"ex_{ex}" for ex in examples])
+        # ctn_pr_curve_gb = ctn_pr_curves_df.groupby('confidence') # DataFrameGroupBy object
+        # ctn_pr_curve = pd.DataFrame()
+        # ctn_pr_curve['precision'] = ctn_pr_curve_gb['n_correctly_pred_positive'].sum() / ctn_pr_curve_gb['n_pred_positive'].sum()
+        # ctn_pr_curve['recall'] = ctn_pr_curve_gb['n_correctly_pred_positive'].sum() / ctn_pr_curve_gb['n_actual_positive'].sum()
 
-    ## Plot curves
-    # Success-coverage curves
-    fig, ax = plt.subplots()
-    plot_sc_curve(ts_curve, ax=ax, label='tsgraspnet')
-    plot_sc_curve(ctn_curve, ax=ax, label='CTN')
-    fig.legend()
-    plt.savefig(cfg.sc_png_path)
+        ## Write dataframes to disk
+        # Success-coverage curves
+        ts_curves_df.to_csv(cfg.tsgrasp_sc_csv_path)
+        # ctn_curves_df.to_csv(cfg.ctn_sc_csv_path)
 
-    # Precision-recall curves
-    fig, ax = plt.subplots()
-    plot_pr_curve(ts_pr_curve, ax=ax, label='tsgraspnet')
-    plot_pr_curve(ctn_pr_curve, ax=ax, label='CTN')
-    fig.legend()
+        # Precision-recall curves
+        ts_pr_curves_df.to_csv(cfg.tsgrasp_pr_csv_path)
+        # ctn_pr_curves_df.to_csv(cfg.ctn_pr_csv_path)
 
-    plt.savefig(cfg.pr_png_path)
+        ## Plot curves
+        # Success-coverage curves
+        fig, ax = plt.subplots()
+        plot_sc_curve(ts_curve, ax=ax, label='tsgraspnet')
+        # plot_sc_curve(ctn_curve, ax=ax, label='CTN')
+        fig.legend()
+        plt.savefig(cfg.sc_png_path)
+
+        # Precision-recall curves
+        fig, ax = plt.subplots()
+        plot_pr_curve(ts_pr_curve, ax=ax, label='tsgraspnet')
+        # plot_pr_curve(ctn_pr_curve, ax=ax, label='CTN')
+        fig.legend()
+
+        plt.savefig(cfg.pr_png_path)
 
 
 if __name__ == "__main__":
