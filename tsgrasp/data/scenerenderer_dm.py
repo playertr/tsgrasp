@@ -187,7 +187,11 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         
         d0 = np.random.uniform(1.5, 2.5) # Orbital distance
         
-        yaws = np.linspace(yaw0, yaw0+2*np.pi * num_frames/30, num_frames)
+        # 66 % chance that the actual yaw velocity has a magnitude less than
+        # yaw_speed
+        yaw_speed = 1 # degrees orbital yaw per frame
+        yaw_velocity = np.random.normal(0, scale=yaw_speed)
+        yaws = np.linspace(yaw0, yaw0+ yaw_velocity*np.pi/180 * num_frames, num_frames)
         ds = d0 * np.ones_like(yaws)
         poses = []
 
