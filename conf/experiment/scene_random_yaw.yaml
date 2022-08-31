@@ -1,0 +1,37 @@
+# @package _global_
+
+defaults:
+  - override /model: tsgraspnet
+  - override /data: scene_renderer_dm
+
+data:
+  data_cfg:
+    dataroot: /scratch/playert/workdir/cgn_data
+    num_workers: 0
+    points_per_frame: 45000
+    
+    frames_per_traj: 1
+    min_pitch: 0.0 # 0 degrees (looking straight down)
+    max_pitch: 1.222 # 70 degrees
+
+    pc_augm:
+      clip: 0.005
+      occlusion_dropout_rate: 0.0
+      occlusion_nclusters: 0
+      sigma: 0.0
+
+    depth_augm:
+      clip: 0.005
+      gaussian_kernel: 0
+      sigma: 0.001
+
+
+training:
+  batch_size: 10
+  gpus: 1
+
+  use_wandb: False
+  wandb:
+    project: "TSGrasp"
+    experiment: "tsgrasp_scene"
+    notes: "Table scene data with random orbital yaw speed"

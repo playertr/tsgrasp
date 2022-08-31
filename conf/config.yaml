@@ -6,20 +6,20 @@ defaults:
   - _self_
 
 # debug, local to tim-ubuntu
-data:
-  data_cfg:
-    points_per_frame: 5000
-    frames_per_traj: 4
-    # dataroot: /home/tim/Research/tsgrasp/data/dataset
-    dataroot: /home/tim/Research/contact_graspnet/acronym
+# data:
+#   data_cfg:
+#     points_per_frame: 5000
+#     frames_per_traj: 4
+#     # dataroot: /home/tim/Research/tsgrasp/data/dataset
+#     dataroot: /home/tim/Research/contact_graspnet/acronym
 
-    # renderer:
-    #   acronym_repo: /home/tim/Research/acronym
+#     # renderer:
+#     #   acronym_repo: /home/tim/Research/acronym
 
-    num_workers: 0
+#     num_workers: 0
 
-training:
-  gpus: 1
-  batch_size: 1
-  save_animations: False
-  make_sc_curve: False
+# training:
+#   gpus: 1
+#   batch_size: 1
+#   save_animations: False
+#   make_sc_curve: False
