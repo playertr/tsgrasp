@@ -14,5 +14,5 @@ TSGrasp: spatio-temporal grasping. Multiple frames go in, dense 6-DOF grasps com
 - `pip install "git+https://github.com/facebookresearch/pytorch3d.git"`
 
 # Usage
--`python -m train experiment=scene_random_yaw`
--`python -m scripts.save_outputs`
+- `python -m train experiment=scene_random_yaw`
+- `python -m scripts.save_outputs`
