@@ -13,22 +13,54 @@
 # description: ??? # Informative blurb about the model being saved.
 
 ## Test config
+# defaults:
+#   - /model: tsgraspnet
+#   - /data: scene_renderer_dm
+#   - /training: default   # needed for batch_size, etc.
+#   - _self_
+
+# data:
+#   data_cfg:
+#     # dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
+#     num_workers: 0
+#     points_per_frame: 45000
+    
+#     frames_per_traj: 1
+#     min_pitch: 0.0 # 0 degrees (looking straight down)
+#     max_pitch: 1.222 # 70 degrees
+
+# training:
+#   gpus: 1
+#   batch_size: 1
+
+# ckpt_path: ${hydra:runtime.cwd}/ckpts/tsgrasp_scene_4_frames/model.ckpt
+# output_name: tsgrasp_scene_4
+# output_path: ${hydra:runtime.cwd}/experiments/${output_name}.h5
+
+# description: This is the tsgrasp_scene_4 outputs.
+
 defaults:
   - /model: tsgraspnet
-  - /data: acronymvid
+  - /data: scene_renderer_dm
   - /training: default   # needed for batch_size, etc.
   - _self_
 
-ckpt_path: ${hydra:runtime.cwd}/ckpts/tsgraspnet_11_17/model.ckpt
-output_name: test_save_outputs
-output_path: ${hydra:runtime.cwd}/experiments/${output_name}.h5
-
-description: This is a test run of the output saver.
+data:
+  data_cfg:
+    # dataroot: /scratch/playert/workdir/tsgrasp/data/acronymvid
+    num_workers: 0
+    points_per_frame: 45000
+    
+    frames_per_traj: 4
+    min_pitch: 0.0 # 0 degrees (looking straight down)
+    max_pitch: 1.222 # 70 degrees
 
 training:
   gpus: 1
-  batch_size: 8
+  batch_size: 1
 
-data:
-  data_cfg:
-    points_per_frame: 1000
+ckpt_path: ${hydra:runtime.cwd}/ckpts/tsgrasp_scene_4_frames/model.ckpt
+output_name: tsgrasp_scene_4-4
+output_path: ${hydra:runtime.cwd}/experiments/${output_name}.h5
+
+description: This is the tsgrasp_scene_4 outputs, inferencing on a four-frame sequence.

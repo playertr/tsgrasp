@@ -24,6 +24,7 @@ class TrajectoryDataset(torch.utils.data.Dataset):
     AVAILABLE_SPLITS = ["train", "val", "test"]
 
     def __init__(self, cfg : DictConfig, split="train"):
+        self.cfg = cfg
         self.frames_per_traj = cfg.frames_per_traj
         self.root = os.path.join(cfg.dataroot, split)
         self.pts_per_frame = cfg.points_per_frame
@@ -44,15 +45,49 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         contact_infos_file = os.path.join(cfg.dataroot, 'contact_infos.pkl')
         if os.path.exists(contact_infos_file):
             with open(contact_infos_file, 'rb') as f:
-                self.contact_infos = pickle.load(f)
+                try:
+                    self.contact_infos = pickle.load(f)
+                except ValueError:
+                    import pickle5 # older versions of pickle don't work
+                    self.contact_infos = pickle5.load(f)
         else:
             self.contact_infos = load_scene_contacts(
                 dataset_folder=cfg.dataroot, scene_contacts_path=cfg.scene_contacts_path)
             with open(contact_infos_file, 'wb') as f:
                 pickle.dump(self.contact_infos, f, pickle.HIGHEST_PROTOCOL)
 
-        self.pcreader = PointCloudReader(
-            root_folder=cfg.dataroot,
+        self.num_train_samples = 8000
+        self.num_test_samples = 2000
+
+    # def download(self):
+    #     if len(os.listdir(self.raw_dir)) == 0:
+    #         print(f"No files found in {self.raw_dir}. Please create the dataset by following tsgrasp/data/data_generation/README.md")
+
+    def __len__(self):
+        return self.num_train_samples if self.split=="train" else self.num_test_samples
+
+    def __getitem__(self, idx):
+        try:
+            return self._getitem(idx) if self.split=="train" else self._getitem(idx + self.num_train_samples)
+        except Exception as e:
+            print(e)
+            return self.__getitem__(np.random.randint(0, self.__len__()))
+
+    def _getitem(self, idx):
+
+        """Generate a random trajectory using the grasp information in this .h5 file."""
+        seed = None if self.split == "train" else idx
+
+        cam_poses = self.make_trajectory(
+            np.zeros(3,), 
+            num_frames=self.frames_per_traj, 
+            min_pitch=self.min_pitch, 
+            max_pitch=self.max_pitch,
+            seed=seed)
+
+        # instantiate pcreader here for multiprocessing memory safety
+        pcreader = PointCloudReader(
+            root_folder=self.cfg.dataroot,
             batch_size=1,
             raw_num_points=self.pts_per_frame,
             estimate_normals=False,
@@ -61,43 +96,26 @@ class TrajectoryDataset(torch.utils.data.Dataset):
             scene_obj_scales=[c['obj_scales'] for c in self.contact_infos],
             scene_obj_paths=[c['obj_paths'] for c in self.contact_infos],
             scene_obj_transforms=[c['obj_transforms'] for c in self.contact_infos],
-            num_train_samples=8000,
-            num_test_samples=2000,
+            num_train_samples=self.num_train_samples,
+            num_test_samples=self.num_test_samples,
             use_farthest_point=False,
             intrinsics=None,
             distance_range=(0.9, 1.3),
             elevation=(30, 150),
-            pc_augm_config=cfg.pc_augm,
-            depth_augm_config=cfg.depth_augm
+            pc_augm_config=self.cfg.pc_augm,
+            depth_augm_config=self.cfg.depth_augm
         )
 
-    # def download(self):
-    #     if len(os.listdir(self.raw_dir)) == 0:
-    #         print(f"No files found in {self.raw_dir}. Please create the dataset by following tsgrasp/data/data_generation/README.md")
-
-    def __len__(self):
-        return self.pcreader._num_train_samples if self.split=="train" else self.pcreader._num_test_samples
-
-    def __getitem__(self, idx):
-        try:
-            return self._getitem(idx) if self.split=="train" else self._getitem(idx + self.pcreader._num_train_samples)
-        except Exception as e:
-            print(e)
-            return self.__getitem__(np.random.randint(0, self.__len__()))
-
-    def _getitem(self, idx):
-
-        """Generate a random trajectory using the grasp information in this .h5 file."""
-
-        cam_poses = self.make_trajectory(
-            np.zeros(3,), 
-            num_frames=self.frames_per_traj, 
-            min_pitch=self.min_pitch, 
-            max_pitch=self.max_pitch)
-
-        pts, cam_poses, scene_idx = self.pcreader.get_scene_batch_with_poses(
+        pts, cam_poses, scene_idx = pcreader.get_scene_batch_with_poses(
             scene_idx=idx, 
             cam_poses=cam_poses)
+
+        # import matplotlib.pyplot as plt
+        # fig = plt.figure()
+        # ax = fig.add_subplot(projection='3d')
+        # ax.scatter3D(pts[0][:,0], pts[0][:,1], pts[0][:,2], marker='.')
+        # ax.set_box_aspect([1,1,1])
+        # plt.show()
 
         cam_poses[..., :3, 1:3] *= -1 # convert from trimesh camera coord reference by flipping Y and Z axes
         tf_obj_to_cam = np.linalg.inv(cam_poses)
@@ -181,7 +199,11 @@ class TrajectoryDataset(torch.utils.data.Dataset):
         
         d0 = np.random.uniform(1.5, 2.5) # Orbital distance
         
-        yaws = np.linspace(yaw0, yaw0+2*np.pi * num_frames/30, num_frames)
+        # 66 % chance that the actual yaw velocity has a magnitude less than
+        # yaw_speed
+        yaw_speed = 1 # degrees orbital yaw per frame
+        yaw_velocity = np.random.normal(0, scale=yaw_speed)
+        yaws = np.linspace(yaw0, yaw0+ yaw_velocity*np.pi/180 * num_frames, num_frames)
         ds = d0 * np.ones_like(yaws)
         poses = []
 
